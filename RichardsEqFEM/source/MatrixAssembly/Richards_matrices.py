@@ -107,7 +107,7 @@ def saturation_matrix_assembly(d,g,order,K,theta,K_prime,theta_prime,psi):
             for i in range(P_El.num_dofs):
                 val=0
                 for k in range(len(Phi)):
-                    val = val +local_vals.theta_in_Q[k]*quadrature[k][2]*Phi[k][i]*Phi[k][j]
+                    val = val +local_vals.theta_prime_Q[k]*quadrature[k][2]*Phi[k][i]*Phi[k][j]
                 #print(val)
                 B[cn[j]][cn[i]] = B[cn[j]][cn[i]] + 0.5*np.abs(jac)*val
     return B
