@@ -41,13 +41,11 @@ class localelement_function_evaluation():
         self.theta_func = theta
         self.theta_prime_func = theta_prime
         self.K_func = K
-        self.K_prime_func = K_prime#*theta_prime
+        self.K_prime_func = K_prime
         
-        # # Derivative of theta wrt psi
+        
         x = sp.symbols('x')
-        # self.theta_prime = sp.diff(self.theta_func(x),x)
-        # # Derivative of K wrt theta
-        # self.K_prime = sp.diff(self.K_func(x),x)
+        
         quadrature = gauss_quadrature_points(P_El.degree +1)
         quadrature_points = quadrature[:,0:2]
         Phi = P_El.phi_eval(quadrature_points)
@@ -65,8 +63,8 @@ class localelement_function_evaluation():
                 #print(gradrt)
             self.val_Q[q] = rt
             self.valgrad_Q[q] = gradrt
-            #print(self.valgrad_Q[q],self.valgrad_Q)
-        #print(self.val_Q)
+        
+        # Initialize
         self.theta = np.zeros((len(u),1))
         self.K = np.zeros((len(u),1))
         self.theta_d_psi = np.zeros((len(u),1))
@@ -75,7 +73,7 @@ class localelement_function_evaluation():
         for k in range(len(u)):
             self.theta[k] = self.theta_func(self.val_Q[k].item())
             #self.K[k]     = self.K_func(self.theta[k].item())
-            #print(self.val[k])
+            
             self.K[k]     = self.K_func(self.val_Q[k].item())
             r = self.K_prime_func.subs(x,self.val_Q[k].item())
             z = self.theta_prime_func.subs(x,self.val_Q[k].item())
@@ -86,8 +84,9 @@ class localelement_function_evaluation():
             self.K_d_theta[k] = r #self.K_prime_func(self.theta[k])
             # derivative of K wrt psi
             self.K_d_psi[k] = self.K_d_theta[k]#*self.theta_d_psi[k]
-            
-        self.interpolate_to_quadpts(P_El) # interpolates K and theta on a local element to quadtarure points
+        
+        # TODO does nothing but keeps naming conventions 
+        self.interpolate_to_quadpts(P_El) 
     
     def interpolate_to_quadpts(self,P_El):
         quadrature = gauss_quadrature_points(P_El.degree +1)
