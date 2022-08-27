@@ -21,17 +21,17 @@ from RichardsEqFEM.source.utils.operators import reference_to_local
 
 
 
-def quad_rule_jacobian(quadrature_deg,e,cn, j, P_El,local_vals,i):
+def quad_rule_jacobian(quadrature_deg,e,cn, i,j, P_El,local_vals):
     # Mapping
     [J, c, J_inv] = reference_to_local(e, P_El.corners,cn)
     
     # Fetch quadrature points
     quadrature = gauss_quadrature_points(quadrature_deg)
     quadrature_points = quadrature[:,0:2]
+    
     Phi = P_El.phi_eval(quadrature_points)
     dPhi = P_El.grad_phi_eval(quadrature_points) 
-    ### this fixes problem is there a way to do it efficiently????
-    quadrature_pt = np.array([quadrature_points]).T
+    
     
      
     local_vals_in_Q = np.dot(local_vals.val.T.reshape(len(local_vals.val)),Phi)
@@ -40,19 +40,17 @@ def quad_rule_jacobian(quadrature_deg,e,cn, j, P_El,local_vals,i):
     
     val=0
     transform = J_inv@J_inv.T
-    
+    #print(transform, J@J.T)
     for k in range(len(dPhi)):
-        
-        vec = [(quadrature_pt)[0][k],(quadrature_pt)[1][k]]
-        q_i = J@vec +c # transformed quadrature points
+     
         w_i = quadrature[k][2] # weights
         
       
-        val += local_vals.K_prime_Q[k]*local_vals_in_Q[k]*w_i*Phi[k][i]*dPhi[k][i]@transform@dPhi[k][j].T
-            
+        #val += local_vals.K_prime_Q[k]*local_vals.val[k]*w_i*Phi[k][i]*dPhi[k][i]@transform@dPhi[k][j].T
+        val += local_vals.K_prime_Q[k]*w_i*Phi[k][i]*local_vals.valgrad_Q[k]@transform@dPhi[k][j].T   
     val = 0.5*val 
    
-    #print(val, local_vals.K_prime_Q)
+    #print(val[0])
     return val
     
 
@@ -86,15 +84,16 @@ def Jacobian_matrices(g,element,d,K,theta,K_prime,theta_prime,psi):
                 psi_local = np.array([psi[cn[0]],psi[cn[1]],psi[cn[2]],psi[cn[3]],psi[cn[4]],psi[cn[5]]])
                 
         local_vals = localelement_function_evaluation(K,theta,K_prime,theta_prime,psi_local,P_El)
-        
+        #print(local_vals.K_prime_Q)
+        #print(local_vals.K_d_theta)
         # Local assembler
         for j in range(P_El.num_dofs):
             for i in range(P_El.num_dofs):
                 A[cn[j],cn[i]] = A[cn[j],cn[i]] + \
-                    quad_rule_jacobian(quadrature_deg,e,cn, i, P_El,local_vals,j)*np.abs(jac)
+                    quad_rule_jacobian(quadrature_deg,e,cn, i,j, P_El,local_vals)*np.abs(jac)
                 
     return A
-def quad_rule_jacobiansat(quadrature_deg,e,cn, j, P_El,local_vals,i):
+def quad_rule_jacobiansat(quadrature_deg,e,cn,i, j, P_El,local_vals):
     # Mapping
     [J, c, J_inv] = reference_to_local(e, P_El.corners,cn)
     
@@ -107,11 +106,12 @@ def quad_rule_jacobiansat(quadrature_deg,e,cn, j, P_El,local_vals,i):
     
     val=0
     
+    # sum over quadrature points
     for k in range(len(Phi)):
        
         w_i = quadrature[k][2] # weights
         
-        val += local_vals.theta_prime_Q[k]*w_i*Phi[k][j]*Phi[k][i]
+        val += local_vals.theta_prime_Q[k]*w_i*Phi[k][i]*Phi[k][j]
             
     val = 0.5*val 
     #print(val, local_vals.K_prime_Q)
@@ -152,7 +152,7 @@ def Jacobian_saturation(g,element,d,K,theta,K_prime,theta_prime,psi):
         for j in range(P_El.num_dofs):
             for i in range(P_El.num_dofs):
                 A[cn[j],cn[i]] = A[cn[j],cn[i]] + \
-                    quad_rule_jacobiansat(quadrature_deg,e,cn, j, P_El,local_vals,i)*np.abs(jac)
+                    quad_rule_jacobiansat(quadrature_deg,e,cn, i,j, P_El,local_vals)*np.abs(jac)
                 
     return A
 
@@ -232,7 +232,7 @@ def Newton_Assembly_alt(g,element,d,K,theta,K_prime,theta_prime,psi):
         G  = np.zeros(dPhi.shape)
         Z  =  np.zeros(dPhi.shape)
         Z2 =  np.zeros(dPhi.shape)
-        
+        test = np.zeros((3,1,2))
         Z3 =  np.zeros(Phi.shape)
         bn=0
         #YY=0
@@ -242,10 +242,10 @@ def Newton_Assembly_alt(g,element,d,K,theta,K_prime,theta_prime,psi):
             G[k] = dPhi[k] @ J_inv.T
  
             Z[k] = local_vals.K_in_Q[k]*dPhi[k] @ J_inv.T # (K(psi) nabla v @J.inv.T)
-            
-            Z2[k] = local_vals.K_prime_Q[k]*local_vals_in_Q[k]*Phi[k]@dPhi[k] @ J_inv.T # (K'(psi)*psi nabla v @J.inv.T)
-                #print(Z2[k])
-            
+            Z2[k] = local_vals.K_prime_Q[k]*local_vals_in_Q[k]*Phi[k]@dPhi[k] @ J_inv.T 
+            #Z2[k] = dPhi[k] @ J_inv.T # (K'(psi)*psi nabla v @J.inv.T)
+            #test[k] = local_vals.K_prime_Q[k]*local_vals_in_Q[k]*Phi[k]
+          
         #print(bn)        
         #print(Z2)
         # compute local stiffnessmatrix
