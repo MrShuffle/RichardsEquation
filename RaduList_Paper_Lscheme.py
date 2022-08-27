@@ -19,8 +19,8 @@ import sympy as sp
 from RichardsEqFEM.source.MatrixAssembly.gravitation import gravity_vector
 
 
-x_part=10
-y_part=15
+x_part=20
+y_part=30
 phys_dim = [2,3]
 g = pp.StructuredTriangleGrid(np.array([x_part, y_part]),phys_dim)
 
@@ -46,12 +46,13 @@ exp_1 = n_g/(n_g-1)
 exp_2 = (n_g-1)/n_g
 
 def K(thetaa):
-    val = ((k_abs)*thetaa**(-1/2))*(1-(1-thetaa**exp_1)**exp_2)**2
+    val = ((k_abs)*((thetaa-the_r)/(the_s-the_r))**(1/2))*(1-(1-((thetaa-the_r)/(the_s-the_r))**exp_1)**exp_2)**2
+   
     return val
 
 def theta(u):
     
-    val = sp.Piecewise((the_r+(the_s-the_r)*(1+(-a_g*u)**n_g)**(-exp_2),u<=0),(the_s,u>0))
+    val = sp.Piecewise((the_r+(the_s-the_r)*(1+(-a_g*u)**n_g)**(-exp_2),u<0),(the_s,u>=0))
     return val
 #f = construct_source_function(u_fabricated,theta,K)
 def f(t,x,y):
@@ -75,10 +76,11 @@ def K(thetaa):
     # else:
     val = ((k_abs)*((thetaa-the_r)/(the_s-the_r))**(1/2))*(1-(1-((thetaa-the_r)/(the_s-the_r))**exp_1)**exp_2)**2
     return val
-def theta(u):
+def thetaglob(u):
     
     #val = sp.Piecewise((the_r+(the_s-the_r)*(1+(-a_g*u)**n_g)**(-exp_2),u<=0),(the_s,u>0))
     #val = sp.lambdify([p],theta)
+    #print(u)
     val = np.zeros((len(u),1))
     if u.shape[0]>=2:
         u = np.resize(u, (u.shape[0],))
@@ -147,17 +149,18 @@ for j in range(timesteps):
         t=t+dt
         f_vect =Source_term_assembly(f,element,d,quad_deg, g, t, time=True)
         
-        theta_t = theta(psi_t)
+        #theta_t = thetaglob(psi_t)
+        theta_t =saturation_matrix_assembly(d, g, order, K, theta, K_prime, theta_prime, psi_t)
         #L-scheme iteration
         while True:
             count = count + 1
             #W,Q =gravitation_matrix(g,element,d,K,theta,K_prime,theta_prime,psi_k)
             A = permability_matrix_assembly(d,g,order,K,theta,K_prime,theta_prime,psi_k)
             g_vect = gravity_vector(element, d, 2, g,K,theta,K_prime,theta_prime,psi_k)
-          
+            C = saturation_matrix_assembly(d, g, order, K, theta, K_prime, theta_prime, psi_k)
 
             lhs = L*B+dt*(A)
-            rhs = L*B@psi_k + B@theta_t - B@theta(psi_k) + dt*f_vect-dt*g_vect
+            rhs = L*B@psi_k + theta_t - C + dt*f_vect-dt*g_vect
             
             
             if t <= 1/16:
@@ -167,7 +170,7 @@ for j in range(timesteps):
             lhs,rhs = dirichlet_BC_func(boundary_two,sec_b_nodes,lhs,rhs,coordinates,t,time=False)  
             psi = np.linalg.solve(lhs,rhs)
             # if count ==20:
-            #     print(np.linalg.norm(psi-psi_k))
+            #print(np.linalg.norm(psi-psi_k))
             store[count-1]= np.linalg.norm(psi-psi_k)
             if np.linalg.norm(psi-psi_k)<=TOL+TOL*np.linalg.norm(psi):
                 break
