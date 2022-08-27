@@ -71,7 +71,7 @@ def saturation_matrix_assembly(d,g,order,K,theta,K_prime,theta_prime,psi):
     
     element = finite_element(order)
     #d = Local_to_Global_table(g, element)
-    B = np.zeros((d.total_geometric_pts, d.total_geometric_pts))  # initalize matrix
+    B = np.zeros((d.total_geometric_pts, 1))  # initalize matrix
     elements = g.cell_nodes()
     points = g.nodes
     loc_node_idx = d.local_dofs_corners
@@ -104,10 +104,11 @@ def saturation_matrix_assembly(d,g,order,K,theta,K_prime,theta_prime,psi):
         jac = np.linalg.det(J2)
 
         for j in range(P_El.num_dofs):
-            for i in range(P_El.num_dofs):
-                val=0
-                for k in range(len(Phi)):
-                    val = val +local_vals.theta_prime_Q[k]*quadrature[k][2]*Phi[k][i]*Phi[k][j]
+            #for i in range(P_El.num_dofs):
+            val=0
+            for k in range(len(Phi)):
+                
+                val = val +local_vals.theta_in_Q[k]*quadrature[k][2]*Phi[k][j]
                 #print(val)
-                B[cn[j]][cn[i]] = B[cn[j]][cn[i]] + 0.5*np.abs(jac)*val
+            B[cn[j]] = B[cn[j]] + 0.5*np.abs(jac)*val
     return B
