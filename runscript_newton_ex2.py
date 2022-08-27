@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Aug 25 13:54:20 2022
+Created on Fri Aug 26 17:37:57 2022
 
 @author: jakob
 """
@@ -13,26 +13,27 @@ from RichardsEqFEM.source.MatrixAssembly.mass_matrix import mass_matrix, mass_ma
 from RichardsEqFEM.source.MatrixAssembly.source_term import Source_term_assembly
 from RichardsEqFEM.source.MatrixAssembly.Richards_matrices import saturation_matrix_assembly,permability_matrix_assembly
 from RichardsEqFEM.source.utils.boundary_conditions import dirichlet_BC
-from RichardsEqFEM.source.utils.create_source_term import construct_source_function
+from RichardsEqFEM.source.utils.create_source_term import construct_source_function_withGrav
 from RichardsEqFEM.source.MatrixAssembly.Richards_Jacobian import Jacobian_saturation, Jacobian_matrices,Newton_Assembly_alt
 import sympy as sp
+from RichardsEqFEM.source.MatrixAssembly.gravitation import gravity_vector, gravity_vector_prime
 
 def u_fabricated(t,x,y):
     u = -t*(1-x)*(1-y)*x*y -1
     
-    #u = np.sin(np.pi*x)*np.sin(np.pi*y)/(2*np.pi**2)
+    #u = np.sin(np.pi*x)*np.sin(np.pi*y)/(2*np.pi**2)-1
     return u
 
 def K(thetaa):
-    #val = (thetaa**(-1))*thetaa**(-1)-2*thetaa**(-1)+1
+    val = (thetaa**(-1))*thetaa**(-1)-2*thetaa**(-1)+1
     #val =1+np.power(thetaa,4)
-    val=1#+thetaa**2
+    #val=1#+thetaa**3
     return val
 
 def theta(u):
-    #val = 1/(1-u)
+    val = 1/(1-u)
     #val=u
-    val = 0.125*u+(1.33-0.125)*np.power(u,3)
+    #val = 0.125*u+(1.33-0.125)*np.power(u,3)
     #val = u+np.power(u,3)
     #val=u/u
     return val
@@ -42,7 +43,7 @@ theta_prime = sp.diff(theta(x),x)
 # Derivative of K wrt theta
 K_prime = sp.diff(K(x),x)
 
-f = construct_source_function(u_fabricated,theta,K)
+f = construct_source_function_withGrav(u_fabricated,theta,K)
 
 x_part=y_part=16
 phys_dim = [1,1]
@@ -98,25 +99,27 @@ for j in range(timesteps):
         count=0
         t=t+dt
         f_vect =Source_term_assembly(f,element,d,quad_deg, g, t, time=True)
-        theta_t = theta(psi_t)
+        #theta_t = theta(psi_t)
         theta_t =saturation_matrix_assembly(d, g, order, K, theta, K_prime, theta_prime, psi_t)
         #L-scheme iteration
         while True:
             count = count + 1
+
+            
+            
             A = permability_matrix_assembly(d,g,order,K,theta,K_prime,theta_prime,psi_k)
-            C = saturation_matrix_assembly(d, g, order, K, theta, K_prime, theta_prime, psi_k)
-            #g_vect_prime = gravity_vector_prime(element, d, quad_deg-2, g,K,theta,K_prime,theta_prime,psi_k)
+            #C= Newton_Assembly_alt(g,element,d,K,theta,K_prime,theta_prime,psi_k)
+            C =saturation_matrix_assembly(d, g, order, K, theta, K_prime, theta_prime, psi_k)
+            g_vect = gravity_vector(element, d, 2, g,K,theta,K_prime,theta_prime,psi_k)
             Jsat= Jacobian_saturation(g,element,d,K,theta,K_prime,theta_prime,psi_k)
             Jperm = Jacobian_matrices(g,element,d,K,theta,K_prime,theta_prime,psi_k)
-            q= Newton_Assembly_alt(g,element,d,K,theta,K_prime,theta_prime,psi_k)
-            #Jperm=q
-            #Jsat=C
+            g_M_prime = gravity_vector_prime(element, d, quad_deg-2, g,K,theta,K_prime,theta_prime,psi_k)
             
-            lhs = Jsat+dt*(A)+dt*Jperm
+            #Jperm =C
+            lhs = Jsat+dt*(A)+dt*Jperm+dt*g_M_prime
+            rhs = Jsat@psi_k + theta_t - C + dt*f_vect-dt*g_vect+dt*Jperm@psi_k+dt*g_M_prime@psi_k
             
-            rhs = Jsat@psi_k + theta_t - C + dt*f_vect+dt*Jperm@psi_k
-            
-          
+    
             
           
             lhs,rhs = dirichlet_BC(-1,b_nodes,lhs,rhs,g)
