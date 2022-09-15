@@ -203,7 +203,7 @@ class L_scheme():
                     vec = [(quadrature_pt)[0][k],(quadrature_pt)[1][k]]
                     q_i = J2@vec +c2 # transformed quadrature points
                     w_i = quadrature[k][2] # weights
-                    val2 += w_i*self.f(t,q_i[0][0],q_i[1][0])*Phi[k][j]
+                    val2 += w_i*self.f(t,q_i[0][0].item(),q_i[1][0].item())*Phi[k][j]
                 #print(val)
                 self.sat_matrix_t[cn[j]] = self.sat_matrix_t[cn[j]] + 0.5*np.abs(jac)*val1
                 self.source_vector[cn[j]] = self.source_vector[cn[j]]+0.5*np.abs(jac)*val2
@@ -392,7 +392,8 @@ class Newton_scheme():
                     vec = [(quadrature_pt)[0][k],(quadrature_pt)[1][k]]
                     q_i = J2@vec +c2 # transformed quadrature points
                     w_i = quadrature[k][2] # weights
-                    val2 += w_i*self.f(t,q_i[0][0],q_i[1][0])*Phi[k][j]
+                    #print(q_i[0][0],q_i[1][0].item())
+                    val2 += w_i*self.f(t,q_i[0][0].item(),q_i[1][0].item())*Phi[k][j]
                 #print(val)
                 self.sat_matrix_t[cn[j]] = self.sat_matrix_t[cn[j]] + 0.5*np.abs(jac)*val1
                 self.source_vector[cn[j]] = self.source_vector[cn[j]]+0.5*np.abs(jac)*val2
