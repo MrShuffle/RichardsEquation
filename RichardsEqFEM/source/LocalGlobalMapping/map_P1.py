@@ -94,36 +94,9 @@ class Local_to_Global_table():
         self.col = np.empty(self.numDataPts, dtype=int)
         
         n=0
-        # Generate map
+        # Generate row and col entries for coo_matrix
         for e in range(self.geometry.num_cells):
-            # elements = geometry.cell_nodes()
-            # cell_node_list = elements.indices[elements.indptr[e] : elements.indptr[e+1]]
-           
-                            
-                                  
-            # # Quick fix of rotation 
-            # if (e) % 2:
-                
-            #     idx = [0, 2, 1]
-            #     cell_node_list = cell_node_list[idx]
-                
-                
-            # else:
-            #     None
-            
-            
-            
-            
-            # for k in self.local_dofs['nodes']:
-            #     #print(i,j,k)
-            #     local = self.local_dofs['nodes'][k]
 
-            #     self.mapping[local,e] = cell_node_list[k]
-                        
-            #             # TODO: add what happens with elements.
-                        
-            #             # if local is tuple... which it is for P3 elements on
-            #             # the faces.
             cn = self.mapping[:,e]
             for k,l in np.ndindex(self.element.num_dofs,self.element.num_dofs):
                 self.row[n] = cn[k]
@@ -140,15 +113,16 @@ class Local_to_Global_table():
         
         self.local_dofs_corners = flat_list
         
+        # Fetch boundary nodes
         self.boundary = geometry.tags['domain_boundary_nodes'].nonzero()[0]
 
-            
+        # Storing quadrature points an weights 
         a =  gauss_quadrature_points(self.degree+1)
         self.quad_pts = a[:,0:2]
         self.quad_weigths = 1/2*a[:,2]
         
     
-    # Need to include d to use multiprocess, must be a better way to do this.
+    
     def L_scheme(self,K, theta,f):
         self.K = K
         self.theta = theta 
@@ -160,12 +134,7 @@ class Local_to_Global_table():
         self.K_prime = K_prime
         self.theta_prime = theta_prime
         self.f = f
-    # update of values need    
-    def update_at_time(self,psi_t):
-        self.psi_t = psi_t
-        
-    def update_at_iteration(self,psi_k):
-        self.psi_k = psi_k
+
         
     def coarse_fine_mesh_nodes(self,x_part,y_part):
         
