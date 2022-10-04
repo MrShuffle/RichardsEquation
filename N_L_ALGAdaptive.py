@@ -13,8 +13,9 @@ from RichardsEqFEM.source.basisfunctions.lagrange_element import finite_element
 from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import Local_to_Global_table
 
 from RichardsEqFEM.source.MatrixAssembly.classLscheme import L_scheme, ModL_scheme
-from RichardsEqFEM.source.MatrixAssembly.Model_class_fast import L_scheme_fast
+from RichardsEqFEM.source.MatrixAssembly.Model_class_fast import L_scheme_fast, Newton_method_fast
 from RichardsEqFEM.source.MatrixAssembly.Model_class_parallell import L_scheme_Parallell, Newton_scheme_Parallell
+#from RichardsEqFEM.source.MatrixAssembly
 from RichardsEqFEM.source.utils.boundary_conditions import dirichlet_BC, dirichlet_BC_func
 #from RichardsEqFEM.source.MatrixAssembly.local_mass_assembly import local_mass_pool, global_assembly_mass
 from multiprocessing import Pool
@@ -87,8 +88,8 @@ if __name__ == '__main__':
     # Derivative of K wrt theta
     K_prime = sp.diff(K(x),x)
     
-    x_part=40
-    y_part=40
+    x_part=80
+    y_part=80
     phys_dim = [1,1]
     g = pp.StructuredTriangleGrid(np.array([x_part, y_part]),phys_dim)
 
@@ -191,7 +192,7 @@ if __name__ == '__main__':
                 # #psi = np.linalg.solve(lhs,rhs)
                 psiN_co = np.resize(psiN_co,(psiN_co.shape[0],1))
                 print(np.linalg.norm(psiN_co-psi_k[d.nodes_coarse_ordered]),'newton')
-                r_N_co = np.linalg.norm(psiN_co-psi_k[d.nodes_coarse_ordered])
+                r_N_co = np.linalg.norm(psiN_co-psi_k[d.nodes_coarse_ordered])+1000
                 
                 Lmet_co.update_at_iteration(psi_k[d.nodes_coarse_ordered])
                 Lmet_co.assemble(psi_k[d.nodes_coarse_ordered])
@@ -237,7 +238,7 @@ if __name__ == '__main__':
                 
                     lhs,rhs = dirichlet_BC(bcval,b_nodes,lhs,rhs,g)
                 
-                    L_count +=1
+                    #L_count +=1
                     #print('l222')
                 
                     psi = sci.sparse.linalg.spsolve(lhs,rhs)
@@ -279,8 +280,7 @@ if __name__ == '__main__':
                 
                     lhs,rhs = dirichlet_BC(bcval,b_nodes,lhs,rhs,g)
                 
-                    L_count +=1
-                    #print('l222')
+                    
                 
                     psi = sci.sparse.linalg.spsolve(lhs,rhs)
                     # #psi = np.linalg.solve(lhs,rhs)
