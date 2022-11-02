@@ -100,44 +100,55 @@ class finite_element():
         self.degree = degree
         self.poly_dim = int((degree+1)*(degree+2)/2) # dimension of mononomial basis of polynomials 
         
+        self.pts = np.array([[0,0],
+                              [1,0],
+                              [0,1]])
+        # dictionary with local nodes
+        self.local_dofs =  {'nodes': {0: [0],
+                                 1: [2],
+                                 2: [1]},
+                            'faces':{},
+                            'elements':{}}
         
-        # P1 element
-        if self.degree == 1:
+
+        self.num_dofs = 3
+        # # P1 element
+        # if self.degree == 1:
             
-            self.pts = np.array([[0,0],
-                                  [1,0],
-                                  [0,1]])
-            # dictionary with local nodes
-            self.local_dofs =  {'nodes': {0: [0],
-                                     1: [2],
-                                     2: [1]},
-                                'faces':{},
-                                'elements':{}}
+        #     self.pts = np.array([[0,0],
+        #                           [1,0],
+        #                           [0,1]])
+        #     # dictionary with local nodes
+        #     self.local_dofs =  {'nodes': {0: [0],
+        #                              1: [2],
+        #                              2: [1]},
+        #                         'faces':{},
+        #                         'elements':{}}
             
 
-            self.num_dofs = 3
+        #     self.num_dofs = 3
         
-        # P2 element
-        elif self.degree ==2:
+        # # P2 element
+        # elif self.degree ==2:
             
-            self.pts = self.__lagrange_pts(self.degree)
-            self.pts = np.array([[0,0],
-                                  [0.5,0],
-                                  [1,0],
-                                  [0.5,0.5],
-                                  [0,1],
-                                  [0,0.5]])
-            self.local_dofs =   {'nodes': {0: [0],
-                                     1: [4],
-                                     2: [2]},
-                                 'faces': {0: [5],
-                                     1: [1],
-                                     2: [3]},
-                                 'elements':{}}
+        #     self.pts = self.__lagrange_pts(self.degree)
+        #     self.pts = np.array([[0,0],
+        #                           [0.5,0],
+        #                           [1,0],
+        #                           [0.5,0.5],
+        #                           [0,1],
+        #                           [0,0.5]])
+        #     self.local_dofs =   {'nodes': {0: [0],
+        #                              1: [4],
+        #                              2: [2]},
+        #                          'faces': {0: [5],
+        #                              1: [1],
+        #                              2: [3]},
+        #                          'elements':{}}
         
-            self.num_dofs = 6
-        else:
-            NotImplementedError()
+        #     self.num_dofs = 6
+        # else:
+        #     NotImplementedError()
             
         V = vandermonde(self.pts, self.degree)
        
@@ -184,24 +195,26 @@ class global_element_geometry(finite_element):
         self.geometry = geometry
        
         
-        
-        # P1 element
-        if self.degree == 1:
+        self.element_coord = self.corners
+        # # P1 element
+        # if self.degree == 1:
 
-            self.element_coord = self.corners
+        #     self.element_coord = self.corners
         
-        # P2 element
-        elif self.degree ==2:
+        # # P2 element
+        # elif self.degree ==2:
  
-            self.element_coord = self.mid_point(self.corners)
-            #print(self.element_coord)
-            #self.element_coord = self.coordinates_sorted(self.geometry,2)
-            #print(self.element_coord)
+        #     self.element_coord = self.mid_point(self.corners)
+        #     #print(self.element_coord)
+        #     #self.element_coord = self.coordinates_sorted(self.geometry,2)
+        #     #print(self.element_coord)
 
-        else:
-            NotImplementedError()
+        # else:
+        #     NotImplementedError()
             
-
+    
+ 
+    
     # TODO: use porepy's g.face_centers instead.
     def mid_point(self,corners):
         
