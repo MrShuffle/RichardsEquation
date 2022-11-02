@@ -6,14 +6,14 @@ Created on Fri Sep 30 12:41:27 2022
 """
 
 import numpy as np
-from RichardsEqFEM.source.localevaluation.local_evaluation import localelement_function_evaluation_L, localelement_function_evaluation,localelement_function_evaluation_P
+from RichardsEqFEM.source.localevaluation.local_evaluation import localelement_function_evaluation_L, localelement_function_evaluation,localelement_function_evaluation_P,localelement_function_evaluation_norms,localelement_function_evaluation_norms2,localelement_function_evaluation_newtonnorm,localelement_function_evaluation_Lnorm
 
 from scipy.sparse.coo import coo_matrix
-import math
+#import math
 from RichardsEqFEM.source.basisfunctions.lagrange_element import global_element_geometry, finite_element
 from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
 import porepy as pp
-from RichardsEqFEM.source.LocalGlobalMapping.map_local_to_global import Local_to_Global_table
+from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import Local_to_Global_table
 import sympy as sp
 from RichardsEqFEM.source.utils.operators import reference_to_local
 #from RichardsEqFEM.source.MatrixAssembly.local_mass_assembly import local_assembly_mass, global_assembly_mass, local_mass_pool
@@ -52,7 +52,7 @@ class L_scheme_Parallell():
         n=0
    
  
-        pool = Pool()
+        pool = Pool(8)
         elements_list =list(range(g.num_cells))
               
         results = pool.map(self.local_mass_assembly,elements_list)
@@ -85,7 +85,7 @@ class L_scheme_Parallell():
         #element = finite_element(self.order)
         n=0
         
-        pool = Pool()
+        pool = Pool(8)
         elements_list =list(range(self.g.num_cells))
         results = pool.map(self.local_Lscheme_assembly,elements_list)
         
@@ -115,7 +115,7 @@ class L_scheme_Parallell():
         self.time = t
         self.psi_t = psi_t
         #self.psi_k = psi_t
-        pool = Pool()
+        pool = Pool(8)
         elements_list =list(range(self.g.num_cells))
         results = pool.map(self.local_source_saturation_assembly,elements_list)
         
@@ -268,8 +268,12 @@ class L_scheme_Parallell():
         self.u_j = u_j
         self.u_j_1 = u_j_1
         val=0
-        for e in range(self.g.num_cells):
-            val +=self.error_on_element(e)
+        pool = Pool(8)
+        elements_list =list(range(self.g.num_cells))
+        results = pool.map(self.error_on_element,elements_list)
+        val= np.sum(results)
+        # for e in range(self.g.num_cells):
+        #     val +=self.error_on_element(e)
             
         self.linear_norm = np.sqrt(val)
     def error_on_element(self,element_num):
@@ -291,14 +295,15 @@ class L_scheme_Parallell():
         # Local pressure head values
         psi_local   = np.array([self.u_j_1[cn[0]],self.u_j_1[cn[1]],self.u_j_1[cn[2]]])
         psi_local2  = np.array([self.u_j[cn[0]],self.u_j[cn[1]],self.u_j[cn[2]]])
-        local_vals  = localelement_function_evaluation_L(self.d.K,self.d.theta,psi_local2,P_El)
-        local_vals2 = localelement_function_evaluation_L(self.d.K,self.d.theta,psi_local,P_El)
+        # local_vals  = localelement_function_evaluation_L(self.d.K,self.d.theta,psi_local2,P_El)
+        # local_vals2 = localelement_function_evaluation_L(self.d.K,self.d.theta,psi_local,P_El)
+        local_vals = localelement_function_evaluation_Lnorm(self.d.K,self.d.theta,psi_local,psi_local2,P_El)
         R_h         = np.dot((psi_local).T.reshape(len(psi_local)),Phi.T)
         
         
         val =0
         for k in range(len(Phi)):
-            val += 0.5*a[k][2]*self.L*R_h[k]**2*det_J+self.dt*0.5*a[k][2]*local_vals.K_in_Q[k]*np.linalg.norm(local_vals2.valgrad_Q[k]@J_inv.T)**2*det_J        
+            val += 0.5*a[k][2]*self.L*R_h[k]**2*det_J+self.dt*0.5*a[k][2]*local_vals.K_in_Q2[k]*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T)**2*det_J        
     
         return val
     
@@ -697,7 +702,7 @@ class Newton_scheme_Parallell():
         self.u_j = u_j
         self.u_j_1 = u_j_1
         val=0
-        pool = Pool()
+        pool = Pool(8)
         elements_list =list(range(self.g.num_cells))
         results = pool.map(self.error_on_element,elements_list)
         val= np.sum(results)
@@ -716,17 +721,17 @@ class Newton_scheme_Parallell():
         [J, c, J_inv] = reference_to_local(P_El.element_coord)
         det_J = np.abs(np.linalg.det(J))
         # Fetch quadrature points
-        a =  gauss_quadrature_points(2) 
-        quadrature_points = a[:,0:2]
-        quadrature_pt = np.array([quadrature_points]).T
-        Phi = P_El.phi_eval(a[:,0:2])
-        dPhi = P_El.grad_phi_eval(a[:,0:2]) 
+        #a =  gauss_quadrature_points(2) 
+        #quadrature_points = a[:,0:2]
+        #quadrature_pt = np.array([quadrature_points]).T
+        Phi = P_El.phi_eval(self.d.quad_pts)
+        #dPhi = P_El.grad_phi_eval(self.d.quad_pts) 
         # Local pressure head values
         psi_local = np.array([self.u_j_1[cn[0]],self.u_j_1[cn[1]],self.u_j_1[cn[2]]])
         psi_local2 = np.array([self.u_j[cn[0]],self.u_j[cn[1]],self.u_j[cn[2]]])
-        local_vals = localelement_function_evaluation(self.d.K,self.d.theta,self.d.K_prime,self.d.theta_prime,psi_local2,P_El)
-        local_vals2 = localelement_function_evaluation(self.d.K,self.d.theta,self.d.K_prime,self.d.theta_prime,psi_local,P_El)
-        
+        # local_vals = localelement_function_evaluation(self.d.K,self.d.theta,self.d.K_prime,self.d.theta_prime,psi_local2,P_El)
+        # local_vals2 = localelement_function_evaluation(self.d.K,self.d.theta,self.d.K_prime,self.d.theta_prime,psi_local,P_El)
+        local_vals = localelement_function_evaluation_newtonnorm(self.d.K, self.d.theta, self.d.theta_prime, psi_local,psi_local2, P_El)
         
         R_h = np.dot((psi_local).T.reshape(len(psi_local)),Phi.T)
         
@@ -735,7 +740,7 @@ class Newton_scheme_Parallell():
         
         val =0
         for k in range(len(Phi)):
-            val += 0.5*a[k][2]*local_vals.theta_prime_Q[k]*R_h[k]**2*det_J+0.5*a[k][2]*self.dt*local_vals.K_in_Q[k]*np.linalg.norm(local_vals2.valgrad_Q[k]@J_inv.T)**2*det_J        
+            val += self.d.quad_weights[k]*local_vals.theta_prime_Q2[k]*R_h[k]**2*det_J+self.d.quad_weights[k]*self.dt*local_vals.K_in_Q2[k]*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T)**2*det_J        
     
         return val
     def estimate_eta(self, u):
@@ -960,77 +965,50 @@ class LN_alg():
         # Initalize matrices
         
         if Switch ==True:
-            if ind ==1:
-                n=0
+      
+            self.sat_matrix_k   = np.zeros((self.d.total_geometric_pts, 1)) 
+            self.gravity_vector = np.zeros((self.d.total_geometric_pts, 1)) 
+
+            n=0
+    
+            _data_perm = []
+            _data_J_perm = []
+            _data_J_sat = []
+            _data_J_grav = []
+            pool = Pool()
+            elements_list =list(range(self.g.num_cells))
+            results = pool.map(self.local_Newtonscheme_assembly,elements_list)
+    
+            for result in results:
         
+                _data_perm.append(result[0].flatten())
+                _data_J_perm.append(result[3].flatten())
+                _data_J_sat.append(result[5].flatten())
+                _data_J_grav.append(result[4].flatten())
+        
+        # for k,l in np.ndindex(self.d.element.num_dofs,self.d.element.num_dofs):
+        #      _data_perm[n]= result[0][k,l]
+        #      _data_J_perm[n] = result[3][k,l]
+        #      _data_J_sat[n] = result[5][k,l]
+        #      _data_J_grav[n] = result[4][k,l]
+        #      n+=1
+             
+                for i in range(len(result[-1])):
+                    self.sat_matrix_k[result[-1][i]] = self.sat_matrix_k[result[-1][i]] + result[2][i]
+   
                 
-                _data_J_perm = []
-                _data_J_sat = []
-                _data_J_grav = []
-                pool = Pool()
-                elements_list =list(range(self.g.num_cells))
-                results = pool.map(self.local_derivative_assembly,elements_list)
+                    self.gravity_vector[result[-1][i]]= self.gravity_vector[result[-1][i]]+result[1][i]
+    
+            _data_perm = np.concatenate(_data_perm)
+            _data_J_perm = np.concatenate(_data_J_perm)
+            _data_J_sat = np.concatenate(_data_J_sat)
+            _data_J_grav = np.concatenate(_data_J_grav)
+   
+            self.perm_matrix = coo_matrix((_data_perm,(self.d.row,self.d.col)))#.tocsr()
+            self.J_perm_matrix = coo_matrix((_data_J_perm,(self.d.row,self.d.col)))#.tocsr()
+            self.J_sat_matrix = coo_matrix((_data_J_sat,(self.d.row,self.d.col)))#.tocsr()
+            self.J_gravity_matrix = coo_matrix((_data_J_grav,(self.d.row,self.d.col)))#.tocsr()
         
-                for result in results:
-            
-                    
-                    _data_J_perm.append(result[0].flatten())
-                    _data_J_sat.append(result[2].flatten())
-                    _data_J_grav.append(result[1].flatten())
-        
-                _data_J_perm = np.concatenate(_data_J_perm)
-                _data_J_sat = np.concatenate(_data_J_sat)
-                _data_J_grav = np.concatenate(_data_J_grav)
-       
-                self.J_perm_matrix = coo_matrix((_data_J_perm,(self.d.row,self.d.col)))#.tocsr()
-                self.J_sat_matrix = coo_matrix((_data_J_sat,(self.d.row,self.d.col)))#.tocsr()
-                self.J_gravity_matrix = coo_matrix((_data_J_grav,(self.d.row,self.d.col)))#.tocsr()
-            
-            
-            else:
-                self.sat_matrix_k   = np.zeros((self.d.total_geometric_pts, 1)) 
-                self.gravity_vector = np.zeros((self.d.total_geometric_pts, 1)) 
-  
-                n=0
-        
-                _data_perm = []
-                _data_J_perm = []
-                _data_J_sat = []
-                _data_J_grav = []
-                pool = Pool()
-                elements_list =list(range(self.g.num_cells))
-                results = pool.map(self.local_Newtonscheme_assembly,elements_list)
-        
-                for result in results:
-            
-                    _data_perm.append(result[0].flatten())
-                    _data_J_perm.append(result[3].flatten())
-                    _data_J_sat.append(result[5].flatten())
-                    _data_J_grav.append(result[4].flatten())
-            
-            # for k,l in np.ndindex(self.d.element.num_dofs,self.d.element.num_dofs):
-            #      _data_perm[n]= result[0][k,l]
-            #      _data_J_perm[n] = result[3][k,l]
-            #      _data_J_sat[n] = result[5][k,l]
-            #      _data_J_grav[n] = result[4][k,l]
-            #      n+=1
-                 
-                    for i in range(len(result[-1])):
-                        self.sat_matrix_k[result[-1][i]] = self.sat_matrix_k[result[-1][i]] + result[2][i]
-       
-                    
-                        self.gravity_vector[result[-1][i]]= self.gravity_vector[result[-1][i]]+result[1][i]
-        
-                _data_perm = np.concatenate(_data_perm)
-                _data_J_perm = np.concatenate(_data_J_perm)
-                _data_J_sat = np.concatenate(_data_J_sat)
-                _data_J_grav = np.concatenate(_data_J_grav)
-       
-                self.perm_matrix = coo_matrix((_data_perm,(self.d.row,self.d.col)))#.tocsr()
-                self.J_perm_matrix = coo_matrix((_data_J_perm,(self.d.row,self.d.col)))#.tocsr()
-                self.J_sat_matrix = coo_matrix((_data_J_sat,(self.d.row,self.d.col)))#.tocsr()
-                self.J_gravity_matrix = coo_matrix((_data_J_grav,(self.d.row,self.d.col)))#.tocsr()
-            
         else:
             self.psi_k = psi_k
             # Initalize matrices
@@ -1235,27 +1213,27 @@ class LN_alg():
         psi_local = np.array([self.psi_k[cn[0]],self.psi_k[cn[1]],self.psi_k[cn[2]]])
         local_vals = localelement_function_evaluation(self.d.K,self.d.theta,self.d.K_prime,self.d.theta_prime,psi_local,P_El)
         
-        local_perm = np.zeros((P_El.num_dofs,P_El.num_dofs))
-        local_gravity = np.zeros((P_El.num_dofs,1))
+        local_perm         = np.zeros((P_El.num_dofs,P_El.num_dofs))
+        local_gravity      = np.zeros((P_El.num_dofs,1))
         local_saturation_k = np.zeros((P_El.num_dofs,1))
-        local_J_perm =  np.zeros((P_El.num_dofs,P_El.num_dofs))
-        local_J_gravity = np.zeros((P_El.num_dofs,P_El.num_dofs))
+        local_J_perm       =  np.zeros((P_El.num_dofs,P_El.num_dofs))
+        local_J_gravity    = np.zeros((P_El.num_dofs,P_El.num_dofs))
         local_J_saturation = np.zeros((P_El.num_dofs,P_El.num_dofs))
         
         transform = J_inv@J_inv.T
-        for j in range(P_El.num_dofs):
+        for j in range(3):
             #val1=0
             val2=0
             val1 = np.sum(local_vals.theta_in_Q*(a[:,2]*Phi[:][j]).reshape(-1,1))
             #valalt2 =  local_vals.K_in_Q*(a[:,2]*np.inner(np.array([0,1]),dPhi[:][j]@J_inv.T)).reshape(-1,1)
-            for k in range(len(Phi)):
+            for k in range(3):
                 #val1 += local_vals.theta_in_Q[k]*a[k][2]*Phi[k][j]
                 val2 += local_vals.K_in_Q[k]*a[k][2]*np.inner(np.array([0,1]),dPhi[k][j]@J_inv.T)
                 
             #print(valalt2,val2)
             local_saturation_k[j] = 0.5*val1*det_J
             local_gravity[j] = 0.5*val2*det_J 
-            for i in range(P_El.num_dofs):
+            for i in range(3):
                 val3 = 0
                 val4 = 0
                 val5 = 0
@@ -1453,16 +1431,16 @@ class LN_alg():
 
         '''
         #self.estimate_CN(self.d.K, K_prime, theta_prime, w1)
-        self.CN=0
+        CN=0
         self.theta_prime = theta_prime
         self.K_prime = K_prime
-        a = 2/(2-self.CN)
+        a = 2/(2-CN)
         #self.linearization_error(w2, w1-w2) 
         #b= self.linear_norm
         self.w1=w1
         self.w2=w2
-        self.diff = self.w1-self.w2
-        pool = Pool()
+        self.diff = w1-w2
+        pool = Pool(8)
         elements_list =list(range(self.g.num_cells))
         results = pool.map(self.norm_N_to_L_on_element,elements_list)
         
@@ -1481,7 +1459,7 @@ class LN_alg():
         
     def norm_N_to_L_on_element(self,element_num):
         cn      = self.d.mapping[:,element_num] # Node values of element
-        corners = self.d.geometry.nodes[0:2,cn[self.d.local_dofs_corners]]  # corners of element
+        corners = self.g.nodes[0:2,cn[self.d.local_dofs_corners]]  # corners of element
         
         # PK element
         P_El    = global_element_geometry(self.d.element, corners,self.d.geometry,self.d.degree)
@@ -1490,43 +1468,44 @@ class LN_alg():
         [J, c, J_inv]     = reference_to_local(P_El.element_coord)
         det_J             = np.abs(np.linalg.det(J))
         # Fetch quadrature points
-        a                 =  gauss_quadrature_points(2) 
-        quadrature_points = a[:,0:2]
-        quadrature_pt     = np.array([quadrature_points]).T
+        # a                 =  gauss_quadrature_points(2) 
+        # quadrature_points = a[:,0:2]
+        # quadrature_pt     = np.array([quadrature_points]).T
         
         # Evaluate basis functions
-        Phi  = P_El.phi_eval(a[:,0:2])
-        dPhi = P_El.grad_phi_eval(a[:,0:2]) 
-        
+        Phi  = P_El.phi_eval(self.d.quad_pts)
+        dPhi = P_El.grad_phi_eval(self.d.quad_pts) 
+        #print(dPhi)
         # Local Values
         psi_local   = np.array([self.w2[cn[0]],self.w2[cn[1]],self.w2[cn[2]]])
         psi_local2  = np.array([self.w1[cn[0]],self.w1[cn[1]],self.w1[cn[2]]])
         psi_local3  = np.array([self.diff[cn[0]],self.diff[cn[1]],self.diff[cn[2]]])
-        local_vals  = localelement_function_evaluation(self.d.K,self.d.theta,self.K_prime,self.theta_prime,psi_local2,P_El)
-        local_vals2 = localelement_function_evaluation(self.d.K,self.d.theta,self.K_prime,self.theta_prime,psi_local,P_El)
-        local_vals3 = localelement_function_evaluation_L(self.d.K,self.d.theta,psi_local3,P_El) 
+        local_vals = localelement_function_evaluation_norms2(self.d.K, self.d.theta, self.d.K_prime, self.d.theta_prime, psi_local2, psi_local, psi_local3, P_El)
+     
+        # local_vals  = localelement_function_evaluation(self.d.K,self.d.theta,self.K_prime,self.theta_prime,psi_local2,P_El)
+        # local_vals2 = localelement_function_evaluation(self.d.K,self.d.theta,self.K_prime,self.theta_prime,psi_local,P_El)
+        # local_vals3 = localelement_function_evaluation_L(self.d.K,self.d.theta,psi_local3,P_El) 
         
-        R_h = np.dot((psi_local3).T.reshape(len(psi_local)),Phi.T)
+        R_h = np.dot((psi_local3).T.reshape(3),Phi.T)
         #if element_num ==5:
         #print(R_h,'fact')
         val  = 0
         val2 = 0
         val3 = 0
-        for k in range(len(Phi)):
+        wi= self.d.quad_weights
+        for k in range(3):
             if 0== local_vals.theta_prime_Q[k]:
-                val+=0# 0.5*a[k][2]*det_J*((np.sqrt(2)/np.pi)/local_vals.K_in_Q[k]**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals2.val_Q[k])-(local_vals.theta_in_Q[k]-local_vals2.theta_in_Q[k])))**2
-         
+                val+= 0#0.5*a[k][2]*det_J*((np.sqrt(2)/np.pi)/local_vals.K_in_Q[k]**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals2.val_Q[k])-(local_vals.theta_in_Q[k]-local_vals2.theta_in_Q[k])))**2
+                
             else:
-                val += 0.5*a[k][2]*det_J*(1/local_vals.theta_prime_Q[k]**(1/2)*(local_vals.theta_prime_Q[k]*(local_vals.val_Q[k]-local_vals2.val_Q[k])-(local_vals.theta_in_Q[k]-local_vals2.theta_in_Q[k])))**2
-            #val += 0.5*a[k][2]*det_J*(1/local_vals.theta_prime_Q[k]**(1/2)*((local_vals.val_Q[k]-local_vals2.val_Q[k])-(local_vals.theta_in_Q[k]-local_vals2.theta_in_Q[k])))**2
-           
-            # if local_vals.K_in_Q[k]==0:
-            #     val2+=0
-            # else:
-            'careful with paranthesis here'
-            val2 += 0.5*a[k][2]*det_J*((((local_vals.K_in_Q[k]-local_vals2.K_in_Q[k]))-(local_vals2.K_prime_Q[k]*(local_vals.val_Q[k]-local_vals2.val_Q[k])))*1/local_vals.K_in_Q[k]**(1/2)*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T+np.array([0,1])))**2
-            val3 += 0.5*a[k][2]*det_J*local_vals2.theta_prime_Q[k]*(R_h[k])**2+self.dt*0.5*a[k][2]*local_vals2.K_in_Q[k]*np.linalg.norm(local_vals3.valgrad_Q[k]@J_inv.T)**2*det_J        
-        
+                val  += wi[k]*det_J*(1/local_vals.theta_prime_Q[k]**(1/2)*(local_vals.theta_prime_Q[k]*(local_vals.val_Q[k]-local_vals.val_Q2[k])-(local_vals.theta_in_Q[k]-local_vals.theta_in_Q2[k])))**2
+            
+            #val4 += self.d.quad_weights[k]*det_J*(1/self.L**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals.val_Q2[k])-(local_vals.theta_in_Q[k]-local_vals.theta_in_Q2[k])))**2
+            val2 += wi[k]*det_J*((((local_vals.K_in_Q[k]-local_vals.K_in_Q2[k]))-(local_vals.K_prime_Q2[k]*(local_vals.val_Q[k]-local_vals.val_Q2[k])))*1/local_vals.K_in_Q[k]**(1/2)*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T+np.array([0,1])))**2
+            #val2 += self.d.quad_weights[k]*det_J*(1/local_vals.K_in_Q[k]**(1/2)*((local_vals.K_in_Q[k]-local_vals.K_in_Q2[k]))*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T+np.array([0,1])))**2
+            val3 += wi[k]*local_vals.theta_prime_Q2[k]*R_h[k]**2*det_J+self.dt*wi[k]*local_vals.K_in_Q2[k]*np.linalg.norm(local_vals.valgrad_Q3[k]@J_inv.T)**2*det_J        
+            
+
         return val,val2,val3
     
     def L_to_N_eta(self,w1,w2,K_prime,theta_prime):
@@ -1545,14 +1524,16 @@ class LN_alg():
         Indicator for switch to Newton's method.
 
         '''
-        self.estimate_CN(self.d.K, K_prime, theta_prime, w1) # estimate C_N^i
+        #self.estimate_CN(self.d.K, K_prime, theta_prime, w1) # estimate C_N^i
+        self.CN=0
+        x = sp.symbols('x')
         self.theta_prime = theta_prime
         self.K_prime = K_prime
         a = 2/(2-self.CN)
         self.w1=w1
         self.w2=w2
         self.diff = self.w1-self.w2
-        pool = Pool()
+        pool = Pool(8)
         elements_list =list(range(self.g.num_cells))
         results = pool.map(self.norm_L_to_N_on_element,elements_list)
         
@@ -1560,6 +1541,7 @@ class LN_alg():
         val2 = 0
         val3 = 0
         val4 = 0
+        
         for result in results:
             
             val  += result[0]
@@ -1580,7 +1562,7 @@ class LN_alg():
     
     def norm_L_to_N_on_element(self,element_num):
         cn = self.d.mapping[:,element_num]
-        corners = self.d.geometry.nodes[0:2,cn[self.d.local_dofs_corners]]  # corners of element
+        corners = self.g.nodes[0:2,cn[self.d.local_dofs_corners]]  # corners of element
         
         
         # PK element
@@ -1588,19 +1570,19 @@ class LN_alg():
         #Map reference element to local element
         [J, c, J_inv] = reference_to_local(P_El.element_coord)
         det_J = np.abs(np.linalg.det(J))
-        # Fetch quadrature points
-        a =  gauss_quadrature_points(2) 
-        quadrature_points = a[:,0:2]
-        quadrature_pt = np.array([quadrature_points]).T
-        Phi = P_El.phi_eval(a[:,0:2])
-        dPhi = P_El.grad_phi_eval(a[:,0:2]) 
+        # # Fetch quadrature points
+        # a =  gauss_quadrature_points(2) 
+        # quadrature_points = a[:,0:2]
+        # quadrature_pt = np.array([quadrature_points]).T
+        Phi = P_El.phi_eval(self.d.quad_pts)
+        dPhi = P_El.grad_phi_eval(self.d.quad_pts) 
         psi_local   = np.array([self.w2[cn[0]],self.w2[cn[1]],self.w2[cn[2]]])
         psi_local2  = np.array([self.w1[cn[0]],self.w1[cn[1]],self.w1[cn[2]]])
         psi_local3  = np.array([self.diff[cn[0]],self.diff[cn[1]],self.diff[cn[2]]])
-        local_vals  = localelement_function_evaluation(self.d.K,self.d.theta,self.K_prime,self.theta_prime,psi_local2,P_El)
-        local_vals2 = localelement_function_evaluation(self.d.K,self.d.theta,self.K_prime,self.theta_prime,psi_local,P_El)
-        local_vals3 = localelement_function_evaluation_L(self.d.K,self.d.theta,psi_local3,P_El) 
-       
+        # local_vals  = localelement_function_evaluation(self.d.K,self.d.theta,self.K_prime,self.theta_prime,psi_local2,P_El)
+        # local_vals2 = localelement_function_evaluation(self.d.K,self.d.theta,self.K_prime,self.theta_prime,psi_local,P_El)
+        # local_vals3 = localelement_function_evaluation_L(self.d.K,self.d.theta,psi_local3,P_El) 
+        local_vals = localelement_function_evaluation_norms(self.d.K, self.d.theta, self.d.K_prime, self.d.theta_prime, psi_local2, psi_local, psi_local3, P_El)
         val  = 0
         val2 = 0
         val3 = 0
@@ -1608,21 +1590,19 @@ class LN_alg():
  
         R_h = np.dot((psi_local3).T.reshape(len(psi_local)),Phi.T)
            
-        
-       
-            
         for k in range(len(Phi)):
             if 0== local_vals.theta_prime_Q[k]:
                 val+= 0#0.5*a[k][2]*det_J*((np.sqrt(2)/np.pi)/local_vals.K_in_Q[k]**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals2.val_Q[k])-(local_vals.theta_in_Q[k]-local_vals2.theta_in_Q[k])))**2
                 
             else:
-                val  += 0.5*a[k][2]*det_J*(1/local_vals.theta_prime_Q[k]**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals2.val_Q[k])-(local_vals.theta_in_Q[k]-local_vals2.theta_in_Q[k])))**2
+                val  += self.d.quad_weights[k]*det_J*(1/local_vals.theta_prime_Q[k]**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals.val_Q2[k])-(local_vals.theta_in_Q[k]-local_vals.theta_in_Q2[k])))**2
             
-            val4 += 0.5*a[k][2]*det_J*(1/self.L**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals2.val_Q[k])-(local_vals.theta_in_Q[k]-local_vals2.theta_in_Q[k])))**2
+            val4 += self.d.quad_weights[k]*det_J*(1/self.L**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals.val_Q2[k])-(local_vals.theta_in_Q[k]-local_vals.theta_in_Q2[k])))**2
         
-            val2 += 0.5*a[k][2]*det_J*(1/local_vals.K_in_Q[k]**(1/2)*((local_vals.K_in_Q[k]-local_vals2.K_in_Q[k]))*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T+np.array([0,1])))**2
-            val3 += 0.5*a[k][2]*self.L*R_h[k]**2*det_J+self.dt*0.5*a[k][2]*local_vals2.K_in_Q[k]*np.linalg.norm(local_vals3.valgrad_Q[k]@J_inv.T)**2*det_J        
-            
+            val2 += self.d.quad_weights[k]*det_J*(1/local_vals.K_in_Q[k]**(1/2)*((local_vals.K_in_Q[k]-local_vals.K_in_Q2[k]))*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T+np.array([0,1])))**2
+            val3 += self.d.quad_weights[k]*self.L*R_h[k]**2*det_J+self.dt*self.d.quad_weights[k]*local_vals.K_in_Q2[k]*np.linalg.norm(local_vals.valgrad_Q3[k]@J_inv.T)**2*det_J        
+
         return val,val2,val3,val4
     def update_L(self,L):
         self.L=L
+        
