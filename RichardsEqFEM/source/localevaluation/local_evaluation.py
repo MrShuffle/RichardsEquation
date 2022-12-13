@@ -12,7 +12,7 @@ from sympy import Function, Matrix, Symbol, simplify
 from sympy.tensor.array import derive_by_array
 
 from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
-from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import \
+from RichardsEqFEM.source.LocalGlobalMapping.map_local_to_global import \
     Local_to_Global_table
 
 # import pandas as pd
