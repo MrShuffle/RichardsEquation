@@ -469,7 +469,7 @@ class LN_alg():
             # C_N^j definition is almost everywhere, for the benchmark problem 5-6 individual points
             # causes C_N^j<2. Those points can be negelcted as the definition is almost everywhere
             # and the points are not measurable. (This criteria does not affect other examples)
-            if theta_prime_Q[k]==0 or 0.395999<=theta_in_Q[k].item()<=0.396:
+            if theta_prime_Q[k]==0:# or 0.395999<=theta_in_Q[k].item()<=0.396:
                 K_prime_Q[k] =0
             
             else:
@@ -511,7 +511,8 @@ class LN_alg():
         '''
 
         CN=0 # To speed up computations
-        
+        # self.estimate_CN(self.d.K, K_prime, theta_prime, w1)
+        # CN = self.CN
         self.theta_prime = theta_prime
         self.K_prime = K_prime
         a = 2/(2-CN)
@@ -569,10 +570,14 @@ class LN_alg():
             if 0== local_vals.theta_prime_Q[k]: # Neglect degenrate region
                 val+= 0
             else:
-                val  += wi[k]*(1/local_vals.theta_prime_Q[k]**(1/2)*(local_vals.theta_prime_Q[k]*(local_vals.val_Q[k]-local_vals.val_Q2[k])-(local_vals.theta_in_Q[k]-local_vals.theta_in_Q2[k])))**2
+                #val  += wi[k]*(1/local_vals.theta_prime_Q[k]**(1/2)*(local_vals.theta_prime_Q[k]*(local_vals.val_Q[k]-local_vals.val_Q2[k])-(local_vals.theta_in_Q[k]-local_vals.theta_in_Q2[k])))**2
+                val  += wi[k]*(1/local_vals.theta_prime_Q[k]**(1/2)*(local_vals.theta_prime_Q2[k]*(local_vals.val_Q[k]-local_vals.val_Q2[k])-(local_vals.theta_in_Q[k]-local_vals.theta_in_Q2[k])))**2
             
             #val4 += self.d.quad_weights[k]*det_J*(1/self.L**(1/2)*(self.L*(local_vals.val_Q[k]-local_vals.val_Q2[k])-(local_vals.theta_in_Q[k]-local_vals.theta_in_Q2[k])))**2
-            val2 += wi[k]*((((local_vals.K_in_Q[k]-local_vals.K_in_Q2[k]))-(local_vals.K_prime_Q2[k]*(local_vals.val_Q[k]-local_vals.val_Q2[k])))*1/local_vals.K_in_Q[k]**(1/2)*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T+np.array([0,1])))**2
+            val2 += wi[k]*((((local_vals.K_in_Q[k]-local_vals.K_in_Q2[k])*np.linalg.norm(local_vals.valgrad_Q2[k]@J_inv.T+np.array([0,1])))-(local_vals.K_prime_Q2[k]*(local_vals.val_Q[k]-local_vals.val_Q2[k])*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T+np.array([0,1]))))*1/local_vals.K_in_Q[k]**(1/2))**2
+            
+            #val2 += wi[k]*
+            
             #val2 += self.d.quad_weights[k]*det_J*(1/local_vals.K_in_Q[k]**(1/2)*((local_vals.K_in_Q[k]-local_vals.K_in_Q2[k]))*np.linalg.norm(local_vals.valgrad_Q[k]@J_inv.T+np.array([0,1])))**2
             val3 += wi[k]*local_vals.theta_prime_Q2[k]*R_h[k]**2+self.dt*wi[k]*local_vals.K_in_Q2[k]*np.linalg.norm(local_vals.valgrad_Q3[k]@J_inv.T)**2      
             
