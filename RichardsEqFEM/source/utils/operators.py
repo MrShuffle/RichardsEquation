@@ -8,7 +8,7 @@ Created on Thu Aug 25 13:42:58 2022
 import numpy as np
 
 
-def reference_to_local(element_num, coordinates, cn):
+def reference_to_local(coordinates):
     # coordinates of the refrence triangle
     mat_coord = np.array([[0, 0, 1], [1, 0, 1], [0, 1, 1]])
     b1 = np.array([[coordinates[0][0]], [coordinates[0][1]], [coordinates[0][2]]])
