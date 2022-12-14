@@ -15,9 +15,9 @@ from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
 from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import \
     Local_to_Global_table
 
-# import pandas as pd
 
 
+# Evaluates functions locally
 class localelement_function_evaluation:
     def __init__(self, K, theta, K_prime, theta_prime, u, P_El):
         """
