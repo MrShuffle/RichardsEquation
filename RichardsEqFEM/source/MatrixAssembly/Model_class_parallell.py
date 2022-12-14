@@ -840,7 +840,7 @@ class LN_alg:
 
             else:
                 val += (
-                    self.d.quad_weights[k]
+                    self.d.quad_weigths[k]
                     * det_J
                     * (
                         1
@@ -854,7 +854,7 @@ class LN_alg:
                 )
 
             val4 += (
-                self.d.quad_weights[k]
+                self.d.quad_weigths[k]
                 * det_J
                 * (
                     1
@@ -868,7 +868,7 @@ class LN_alg:
             )
 
             val2 += (
-                self.d.quad_weights[k]
+                self.d.quad_weigths[k]
                 * det_J
                 * (
                     1
@@ -881,7 +881,7 @@ class LN_alg:
                 ** 2
             )
             val3 += (
-                self.d.quad_weights[k] * self.L * R_h[k] ** 2 * det_J
+                self.d.quad_weigths[k] * self.L * R_h[k] ** 2 * det_J
                 + self.dt
                 * self.d.quad_weights[k]
                 * local_vals.K_in_Q2[k]
