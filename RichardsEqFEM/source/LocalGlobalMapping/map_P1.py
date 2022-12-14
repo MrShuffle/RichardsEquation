@@ -122,7 +122,7 @@ class Local_to_Global_table:
         # Storing quadrature points an weights
         a = gauss_quadrature_points(self.degree + 1)
         self.quad_pts = a[:, 0:2]
-        self.quad_weigths = 1 / 2 * a[:, 2]
+        self.quad_weights = 1 / 2 * a[:, 2]
 
     def L_scheme(self, K, theta, f):
         self.K = K
