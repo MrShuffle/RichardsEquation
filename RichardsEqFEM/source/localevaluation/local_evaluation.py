@@ -27,6 +27,8 @@ class localelement_function_evaluation:
         ----------
         K : Permability -function of theta.
         theta : Saturation -function of psi.
+        K_prime : Derivative of permability -function of theta.
+        theta_prime : Derivative of aturation -function of psi.
         u : a vector with psi value.
         PK : PK element number of the class global_element_geometry(element,corners,g,order).
 
@@ -36,12 +38,6 @@ class localelement_function_evaluation:
 
         """
 
-        # idea define a tring with keywords like {K:'permability', theta:'saturation'}
-        # the extract keywords if they are given, both K and theta should be functions, but maybe this should be input
-        # matrix assembly, this would allow for specified functions determining what to do with each
-        # they will both be part of the residual
-
-        # self.val = u
         theta_func = theta
         x = sp.symbols("x")
         theta_prime_func = sp.lambdify([x], theta_prime)
@@ -52,38 +48,28 @@ class localelement_function_evaluation:
         quadrature_points = quadrature[:, 0:2]
         Phi = P_El.phi_eval(quadrature_points)
         dPhi = P_El.grad_phi_eval(quadrature_points)
-        # self.val_Q = np.zeros((len(Phi),1))# np.dot(self.val.T.reshape(len(self.val)),Phi.T)
-        # self.valgrad_Q = np.zeros((dPhi.shape[1],dPhi.shape[2]))
-        # sum over quadrature points q
+ 
+        # Sum over quadrature points 
         self.valgrad_Q = np.tensordot(u, dPhi, axes=((0), (1)))[0]
         self.val_Q = np.sum(u * Phi, axis=0)
         # Initialize
         self.theta_in_Q = np.zeros((len(u), 1))
         self.K_in_Q = np.zeros((len(u), 1))
-        # self.theta_prime_Q = np.zeros((len(u),1))
-        # self.K_d_theta = np.zeros((len(u),1))
         self.K_prime_Q = np.zeros((len(u), 1))
+        
+        # Derivative of theta wrt psi
         self.theta_prime_Q = theta_prime_func(self.val_Q)
-        # self.theta_in_Q = theta_func(self.val_Q)
-        # self.K_prime_Q = K_prime_func(self.theta_in_Q)*self.theta_prime_Q
+
         for k in range(len(u)):
             self.theta_in_Q[k] = theta_func(self.val_Q[k].item())
             self.K_in_Q[k] = K_func(self.theta_in_Q[k].item())
 
-            # self.K[k]     = self.K_func(self.val_Q[k].item())
-            # r = self.K_prime_func.subs(x,self.val_Q[k].item())
-            # z = self.theta_prime_func.subs(x,self.val_Q[k].item())
-            # r = self.K_prime_func.subs(x,self.theta_in_Q[k].item())
-
-            # self.theta_prime_Q[k] = theta_prime_func(self.val_Q[k].item())#self.theta_prime_func.evalf(subs={x: np.asscalar(self.val[k])})
-            # print(r)
-            # derivative of theta wrt psi
-            # self.K_d_theta[k] = r #self.K_prime_func(self.theta[k])
+    
             # derivative of K wrt psi
             self.K_prime_Q[k] = (
                 K_prime_func(self.theta_in_Q[k].item()) * self.theta_prime_Q[k]
             )
-        # self.K_prime_Q = np.multiply(K_prime_func(self.theta_in_Q),self.theta_prime_Q)
+  
 
 
 class localelement_function_evaluation_newtonnorm:
