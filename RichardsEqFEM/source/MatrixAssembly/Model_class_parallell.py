@@ -32,15 +32,11 @@ class LN_alg:
         g,
         order,
         psi,
-        K,
         theta,
-        K_prime,
+        K,
         theta_prime,
+        K_prime,
         f,
-        theta_np,
-        K_np,
-        theta_prime_np,
-        K_prime_np,
         Switch=False,
     ):
         """
@@ -70,8 +66,6 @@ class LN_alg:
 
         self.L = L
         self.dt = dt
-        self.K = K
-        self.theta = theta
         self.f = f
 
         self.g = g
@@ -89,12 +83,12 @@ class LN_alg:
 
         # Model
         self.hydraulics = RichardsLocalEvaluation(
-            theta_np, theta_prime_np, K_np, K_prime_np
+            theta, theta_prime, K, K_prime
         )
-        self.theta_np = theta_np
-        self.theta_prime_np = theta_prime_np
-        self.K_np = K_np
-        self.K_prime_np = K_prime_np
+        self.theta = theta
+        self.theta_prime = theta_prime
+        self.K = K
+        self.K_prime = K_prime
 
         # Assemble mass matrix
         _data_mass = np.empty(d.numDataPts, dtype=np.double)
@@ -553,9 +547,9 @@ class LN_alg:
         # astype remeber
         K_prime_Q = np.zeros((len(u), 1), dtype=np.float32)
 
-        theta_in_Q = self.theta_np(np.ravel(u))
-        K_in_Q = self.K_np(np.ravel(theta_in_Q))
-        theta_prime_Q = self.theta_prime_np(np.ravel(u))
+        theta_in_Q = self.theta(np.ravel(u))
+        K_in_Q = self.K(np.ravel(theta_in_Q))
+        theta_prime_Q = self.theta_prime(np.ravel(u))
 
         for k in range(len(u)):
 
@@ -571,7 +565,7 @@ class LN_alg:
 
             else:
                 K_prime_Q[k] = (
-                    self.K_prime_np(theta_in_Q[k].item()) * theta_prime_Q[k]
+                    self.K_prime(theta_in_Q[k].item()) * theta_prime_Q[k]
                 ).astype(np.float16)
 
             # Compute C_N^j at every point

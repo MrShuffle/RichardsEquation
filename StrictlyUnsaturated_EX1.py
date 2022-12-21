@@ -29,11 +29,18 @@ exp_1 = n_g / (n_g - 1)
 exp_2 = (n_g - 1) / n_g
 
 
-# def theta_sp(u):
+# Sympy version
+def theta_sp(u):
 
-#     val = sp.Piecewise((the_r+(the_s-the_r)*(sp.functions.elementary.complexes.Abs(1+(sp.functions.elementary.complexes.Abs(-a_g*u))**n_g))**(-exp_2),u<0),(the_s,u>=0))
-#     return val
-
+    val = sp.Piecewise(
+        (the_r + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2), u < 0),
+        (the_s, u >= 0),
+    )
+    # if u<0:
+    #     val= the_r+(the_s-the_r)*(1+(np.abs(-a_g*u))**n_g)**(-exp_2)
+    # else:
+    #     val=the_s
+    return val
 
 def K_sp(thetaa):
     val = ((k_abs) * ((thetaa - the_r) / (the_s - the_r)) ** (1 / 2)) * (
@@ -54,27 +61,7 @@ def K_sp(thetaa):
 
     return val
 
-
-def K(thetaa):
-    val = ((k_abs) * ((thetaa - the_r) / (the_s - the_r)) ** (1 / 2)) * (
-        1 - (1 - ((thetaa - the_r) / (the_s - the_r)) ** exp_1) ** exp_2
-    ) ** 2
-
-    return val
-
-
-def theta(u):
-
-    val = sp.Piecewise(
-        (the_r + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2), u < 0),
-        (the_s, u >= 0),
-    )
-    # if u<0:
-    #     val= the_r+(the_s-the_r)*(1+(np.abs(-a_g*u))**n_g)**(-exp_2)
-    # else:
-    #     val=the_s
-    return val
-
+# Numpy versions (faster)
 def theta_np(u):
 
     return np.piecewise(
@@ -118,10 +105,12 @@ def f(t, x, y):
 
 if __name__ == "__main__":
 
-    # Compute derivatives
-    x = sp.symbols("x", real=True)
-    theta_prime = sp.diff(theta(x), x)
-    K_prime = sp.diff(K_sp(x), x)
+    # # Compute derivatives
+    # x = sp.symbols("x", real=True)
+    # theta_prime = sp.diff(theta_sp(x), x)
+    # K_prime = sp.diff(K_sp(x), x)
+    # print(theta_prime)
+    # print(K_prime)
 
     # Define mesh partitions
     x_part = 40
@@ -182,7 +171,7 @@ if __name__ == "__main__":
     L_count_tot = 0
     N_count_tot = 0
 
-    scheme = LN_alg(L, dt, d, g, order, psi_t, K, theta, K_prime, theta_prime, f, theta_np,K_np, theta_prime_np, K_prime_np, f)
+    scheme = LN_alg(L, dt, d, g, order, psi_t, theta_np, K_np, theta_prime_np, K_prime_np, f)
 
     bcval = -4
     for j in range(timesteps):
