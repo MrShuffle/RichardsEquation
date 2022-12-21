@@ -6,18 +6,13 @@ Created on Fri Sep 30 12:41:27 2022
 """
 
 import math
-import time
 from multiprocessing import Pool
 
 import numpy as np
-import sympy as sp
+from RichardsEqFEM.source.basisfunctions.lagrange_element import global_element_geometry
 from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
-from RichardsEqFEM.source.basisfunctions.lagrange_element import (
-    finite_element,
-    global_element_geometry,
-)
-from RichardsEqFEM.source.localevaluation.local_evaluation_new import (
-    RichardsLocalEvaluation,
+from RichardsEqFEM.source.localevaluation.local_evaluation import (
+    HydraulicsLocalEvaluation,
 )
 from RichardsEqFEM.source.utils.operators import reference_to_local
 from scipy.sparse.coo import coo_matrix
@@ -55,7 +50,8 @@ class LN_alg:
         K_prime : Derivative of permeability.
         theta_prime : Derivative of saturation.
         f : Source term.
-        Switch : Boolean, False meaning L-scheme iteration, True meaning Newton iteration. The default is False.
+        Switch : Boolean, False meaning L-scheme iteration, True meaning
+            Newton iteration. The default is False.
 
         Returns
         -------
@@ -82,9 +78,7 @@ class LN_alg:
         self._build_fe_cache()
 
         # Model
-        self.hydraulics = RichardsLocalEvaluation(
-            theta, theta_prime, K, K_prime
-        )
+        self.hydraulics = HydraulicsLocalEvaluation(theta, theta_prime, K, K_prime)
         self.theta = theta
         self.theta_prime = theta_prime
         self.K = K
@@ -173,7 +167,6 @@ class LN_alg:
                         self.gravity_vector[result[-1][i]] + result[1][i]
                     )
 
-
             _data_perm = np.concatenate(_data_perm)
             _data_J_perm = np.concatenate(_data_J_perm)
             _data_J_sat = np.concatenate(_data_J_sat)
@@ -257,7 +250,7 @@ class LN_alg:
     # Assemble lhs and rhs of either L-scheme of Newton's method
     def assemble(self, psi_k, Switch):
 
-        if Switch == True:
+        if Switch:
             self.lhs = (
                 self.J_sat_matrix
                 + self.dt * self.perm_matrix
@@ -545,7 +538,9 @@ class LN_alg:
             # C_N^j definition is almost everywhere, for the benchmark problem 5-6 individual points
             # causes C_N^j<2. Those points can be negelcted as the definition is almost everywhere
             # and the points are not measurable. (This criteria does not affect other examples)
-            if math.isclose(theta_prime_Q[k], 0):  # or 0.395999<=theta_in_Q[k].item()<=0.396:
+            if math.isclose(
+                theta_prime_Q[k], 0
+            ):  # or 0.395999<=theta_in_Q[k].item()<=0.396:
                 K_prime_Q[k] = 0
 
             else:
