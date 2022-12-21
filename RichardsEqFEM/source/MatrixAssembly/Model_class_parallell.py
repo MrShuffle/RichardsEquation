@@ -459,7 +459,7 @@ class LN_alg:
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
 
         # Local pressure head values
-        psi_local = np.array([self.psi_k[cn[0]], self.psi_k[cn[1]], self.psi_k[cn[2]]])
+        psi_local = np.array([self.psi_k[cn[i]] for i in range(3)])
 
         # Hydraulics evaluated
         local_vals = self.hydraulics.function_evaluation_L(psi_local, Phi, dPhi)
@@ -519,12 +519,12 @@ class LN_alg:
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
 
         # Local pressure head values
-        psi_local = np.array([self.u_j_1[cn[0]], self.u_j_1[cn[1]], self.u_j_1[cn[2]]])
-        psi_local2 = np.array([self.u_j[cn[0]], self.u_j[cn[1]], self.u_j[cn[2]]])
+        psi_local = np.array([self.u_j_1[cn[i]] for i in range(3)])
+        psi_local2 = np.array([self.u_j[cn[i]] for i in range(3)])
 
-        # Evaluate functions locally
-        local_vals = localelement_function_evaluation_newtonnorm(
-            self.d.K, self.d.theta, self.d.theta_prime, psi_local, psi_local2, Phi, dPhi
+        ## Evaluate functions locally
+        local_vals = self.hydraulics.function_evaluation_newtonnorm(
+            psi_local, psi_local2, Phi, dPhi
         )
 
         R_h = np.dot((psi_local).T.reshape(len(psi_local)), Phi.T)
@@ -671,18 +671,13 @@ class LN_alg:
         psi_local = np.array([self.w2[cn[i]] for i in range(3)])
         psi_local2 = np.array([self.w1[cn[i]] for i in range(3)])
         psi_local3 = np.array([self.diff[cn[i]] for i in range(3)])
-        local_vals = localelement_function_evaluation_norms2(
-            self.d.K,
-            self.d.theta,
-            self.d.K_prime,
-            self.d.theta_prime,
+        local_vals = self.hydraulics.function_evaluation_norms2(
             psi_local2,
             psi_local,
             psi_local3,
             Phi,
             dPhi,
         )
-        # print(f"time 2: {time.time() - tic}")
 
         R_h = np.dot((psi_local3).T.reshape(3), Phi.T)
 
@@ -691,16 +686,16 @@ class LN_alg:
         K_nonzero = [
             k
             for k in range(len(Phi))
-            if not math.isclose(local_vals.theta_prime_Q[k], 0)
+            if not math.isclose(local_vals.theta_prime_Q[k][0], 0)
         ]
         val = sum(
             [
                 wi[k]
                 * (
                     1
-                    / local_vals.theta_prime_Q[k] ** (1 / 2)
+                    / local_vals.theta_prime_Q[k][0] ** (1 / 2)
                     * (
-                        local_vals.theta_prime_Q2[k]
+                        local_vals.theta_prime_Q2[k][0]
                         * (local_vals.val_Q[k] - local_vals.val_Q2[k])
                         - (local_vals.theta_in_Q[k] - local_vals.theta_in_Q2[k])
                     )
@@ -739,7 +734,7 @@ class LN_alg:
 
         val3 = sum(
             [
-                wi[k] * local_vals.theta_prime_Q2[k] * R_h[k] ** 2
+                wi[k] * local_vals.theta_prime_Q2[k][0] * R_h[k] ** 2
                 + self.dt
                 * wi[k]
                 * local_vals.K_in_Q2[k]
@@ -804,11 +799,7 @@ class LN_alg:
         psi_local = np.array([self.w2[cn[i]] for i in range(3)])
         psi_local2 = np.array([self.w1[cn[i]] for i in range(3)])
         psi_local3 = np.array([self.diff[cn[i]] for i in range(3)])
-        local_vals = localelement_function_evaluation_norms(
-            self.d.K,
-            self.d.theta,
-            self.d.K_prime,
-            self.d.theta_prime,
+        local_vals = self.hydraulics.function_evaluation_norms(
             psi_local2,
             psi_local,
             psi_local3,
@@ -821,7 +812,7 @@ class LN_alg:
         K_nonzero = [
             k
             for k in range(len(Phi))
-            if not math.isclose(local_vals.theta_prime_Q[k], 0)
+            if not math.isclose(local_vals.theta_prime_Q[k][0], 0)
         ]
 
         val = sum(
@@ -830,7 +821,7 @@ class LN_alg:
                 * det_J
                 * (
                     1
-                    / local_vals.theta_prime_Q[k] ** (1 / 2)
+                    / local_vals.theta_prime_Q[k][0] ** (1 / 2)
                     * (
                         self.L * (local_vals.val_Q[k] - local_vals.val_Q2[k])
                         - (local_vals.theta_in_Q[k] - local_vals.theta_in_Q2[k])
