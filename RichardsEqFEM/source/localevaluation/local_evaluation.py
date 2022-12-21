@@ -19,7 +19,7 @@ from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import \
 
 # Evaluates functions locally
 class localelement_function_evaluation:
-    def __init__(self, K, theta, K_prime, theta_prime, u, P_El):
+    def __init__(self, K, theta, K_prime, theta_prime, u, Phi, dPhi):
         """
 
 
@@ -44,11 +44,6 @@ class localelement_function_evaluation:
         K_func = K
         K_prime_func = sp.lambdify([x], K_prime)
 
-        quadrature = gauss_quadrature_points(P_El.degree + 1)
-        quadrature_points = quadrature[:, 0:2]
-        Phi = P_El.phi_eval(quadrature_points)
-        dPhi = P_El.grad_phi_eval(quadrature_points)
- 
         # Sum over quadrature points 
         self.valgrad_Q = np.tensordot(u, dPhi, axes=((0), (1)))[0]
         self.val_Q = np.sum(u * Phi, axis=0)
@@ -73,7 +68,7 @@ class localelement_function_evaluation:
 
 
 class localelement_function_evaluation_newtonnorm:
-    def __init__(self, K, theta, theta_prime, u, u2, P_El):
+    def __init__(self, K, theta, theta_prime, u, u2, Phi, dPhi):
         """
 
 
@@ -102,10 +97,6 @@ class localelement_function_evaluation_newtonnorm:
         K_func = K
         # K_prime_func = sp.lambdify([x],K_prime)
 
-        quadrature = gauss_quadrature_points(P_El.degree + 1)
-        quadrature_points = quadrature[:, 0:2]
-        Phi = P_El.phi_eval(quadrature_points)
-        dPhi = P_El.grad_phi_eval(quadrature_points)
         # self.val_Q = np.zeros((len(Phi),1))# np.dot(self.val.T.reshape(len(self.val)),Phi.T)
         # self.valgrad_Q = np.zeros((dPhi.shape[1],dPhi.shape[2]))
         # sum over quadrature points q
@@ -132,7 +123,7 @@ class localelement_function_evaluation_newtonnorm:
 
 
 class localelement_function_evaluation_Lnorm:
-    def __init__(self, K, theta, u, u2, P_El):
+    def __init__(self, K, theta, u, u2, Phi, dPhi):
         """
 
 
@@ -161,10 +152,6 @@ class localelement_function_evaluation_Lnorm:
         K_func = K
         # K_prime_func = sp.lambdify([x],K_prime)
 
-        quadrature = gauss_quadrature_points(P_El.degree + 1)
-        quadrature_points = quadrature[:, 0:2]
-        Phi = P_El.phi_eval(quadrature_points)
-        dPhi = P_El.grad_phi_eval(quadrature_points)
         # self.val_Q = np.zeros((len(Phi),1))# np.dot(self.val.T.reshape(len(self.val)),Phi.T)
         # self.valgrad_Q = np.zeros((dPhi.shape[1],dPhi.shape[2]))
         # sum over quadrature points q
@@ -189,7 +176,7 @@ class localelement_function_evaluation_Lnorm:
 
 
 class localelement_function_evaluation_P:
-    def __init__(self, K, theta, theta_prime, u, P_El):
+    def __init__(self, K, theta, theta_prime, u, Phi, dPhi):
         """
 
 
@@ -217,10 +204,6 @@ class localelement_function_evaluation_P:
         K_func = K
         # K_prime_func = sp.lambdify([x],K_prime)
 
-        quadrature = gauss_quadrature_points(P_El.degree + 1)
-        quadrature_points = quadrature[:, 0:2]
-        Phi = P_El.phi_eval(quadrature_points)
-        dPhi = P_El.grad_phi_eval(quadrature_points)
         # self.val_Q = np.zeros((len(Phi),1))# np.dot(self.val.T.reshape(len(self.val)),Phi.T)
         # self.valgrad_Q = np.zeros((dPhi.shape[1],dPhi.shape[2]))
         # sum over quadrature points q
@@ -253,7 +236,7 @@ class localelement_function_evaluation_P:
 
 
 class localelement_function_evaluation_L:
-    def __init__(self, K, theta, u, P_El):
+    def __init__(self, K, theta, u, Phi, dPhi):
         """
 
 
@@ -282,10 +265,6 @@ class localelement_function_evaluation_L:
         # print(self.val)
         x = sp.symbols("x")
 
-        quadrature = gauss_quadrature_points(P_El.degree + 1)
-        quadrature_points = quadrature[:, 0:2]
-        Phi = P_El.phi_eval(quadrature_points)
-        dPhi = P_El.grad_phi_eval(quadrature_points)
         # self.val_Q = np.zeros((len(Phi),1))# np.dot(self.val.T.reshape(len(self.val)),Phi.T)
 
         # # sum over quadrature points q
@@ -329,7 +308,7 @@ class localelement_function_evaluation_L:
 
 
 class localelement_function_evaluation_norms:
-    def __init__(self, K, theta, K_prime, theta_prime, u, u2, u3, P_El):
+    def __init__(self, K, theta, K_prime, theta_prime, u, u2, u3, Phi, dPhi):
         """
 
 
@@ -360,10 +339,6 @@ class localelement_function_evaluation_norms:
         self.K_func = K
         # self.K_prime_func = K_prime
 
-        quadrature = gauss_quadrature_points(P_El.degree + 1)
-        quadrature_points = quadrature[:, 0:2]
-        Phi = P_El.phi_eval(quadrature_points)
-        dPhi = P_El.grad_phi_eval(quadrature_points)
         # self.val_Q = np.zeros((len(Phi),1))# np.dot(self.val.T.reshape(len(self.val)),Phi.T)
         self.valgrad_Q = np.zeros((dPhi.shape[1], dPhi.shape[2]))
         # self.val_Q2 = np.zeros((len(Phi),1))# np.dot(self.val.T.reshape(len(self.val)),Phi.T)
@@ -435,7 +410,7 @@ class localelement_function_evaluation_norms:
 
 
 class localelement_function_evaluation_norms2:
-    def __init__(self, K_func, theta_func, K_prime, theta_prime, val, val2, val3, P_El):
+    def __init__(self, K_func, theta_func, K_prime, theta_prime, val, val2, val3, Phi, dPhi):
         """
 
 
@@ -458,11 +433,6 @@ class localelement_function_evaluation_norms2:
 
         K_prime_func = sp.lambdify([x], K_prime)
         # K_prime_func = K_prime
-
-        quadrature = gauss_quadrature_points(P_El.degree + 1)
-        quadrature_points = quadrature[:, 0:2]
-        Phi = P_El.phi_eval(quadrature_points)
-        dPhi = P_El.grad_phi_eval(quadrature_points)
 
         # dF = pd.DataFrame(val)
         # self.theta_in_Q = dF.apply(theta_func)
