@@ -97,18 +97,14 @@ class LN_alg:
         pool = Pool()
         elements_list = list(range(g.num_cells))
 
-        tic = time.time()
         results = pool.map(self.local_mass_assembly, elements_list)
-        print(f"ln init pool {time.time() - tic}")
 
-        tic = time.time()
         for result in results:
 
             for k, l in np.ndindex(d.element.num_dofs, d.element.num_dofs):
 
                 _data_mass[n] = result[k, l]
                 n += 1
-        print(f"ln init for {time.time() - tic}")
 
         mass_m = coo_matrix((_data_mass, (d.row, d.col))).tocsr()
 
@@ -158,13 +154,9 @@ class LN_alg:
             _data_J_grav = []
             pool = Pool()
 
-            tic = time.time()
             elements_list = list(range(self.g.num_cells))
-            print("num cells {self.g.num_cells}")
             results = pool.map(self.local_Newtonscheme_assembly, elements_list)
-            print(f"ln iteration switch pool {time.time() - tic}")
 
-            tic = time.time()
             for result in results:
 
                 _data_perm.append(result[0].flatten())
@@ -181,7 +173,6 @@ class LN_alg:
                         self.gravity_vector[result[-1][i]] + result[1][i]
                     )
 
-            print(f"ln iteration switch for {time.time() - tic}")
 
             _data_perm = np.concatenate(_data_perm)
             _data_J_perm = np.concatenate(_data_J_perm)
@@ -214,12 +205,9 @@ class LN_alg:
 
             pool = Pool()
 
-            tic = time.time()
             elements_list = list(range(self.g.num_cells))
             results = pool.map(self.local_Lscheme_assembly, elements_list)
-            print(f"ln iteration no switch pool {time.time() - tic}")
 
-            tic = time.time()
             for result in results:
 
                 # _data_m.append(result)
@@ -237,7 +225,6 @@ class LN_alg:
                     self.gravity_vector[result[-1][i]] = (
                         self.gravity_vector[result[-1][i]] + result[1][i]
                     )
-            print(f"ln iteration no switch for {time.time() - tic}")
 
             self.perm_matrix = coo_matrix(
                 (_data_perm, (self.d.row, self.d.col))
@@ -254,9 +241,7 @@ class LN_alg:
         # self.psi_k = psi_t
         pool = Pool()
         elements_list = list(range(self.g.num_cells))
-        tic = time.time()
         results = pool.map(self.local_source_saturation_assembly, elements_list)
-        print(f"upate at newtime inner: {time.time() - tic}")
 
         for result in results:
 
@@ -640,7 +625,6 @@ class LN_alg:
         # Fetch FE
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
 
-        tic = time.time()
         # Evaluate basis functions
 
         # Local Values
