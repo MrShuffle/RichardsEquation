@@ -16,13 +16,6 @@ from RichardsEqFEM.source.basisfunctions.lagrange_element import (
     finite_element,
     global_element_geometry,
 )
-from RichardsEqFEM.source.localevaluation.local_evaluation import (
-    localelement_function_evaluation,
-    localelement_function_evaluation_L,
-    localelement_function_evaluation_newtonnorm,
-    localelement_function_evaluation_norms,
-    localelement_function_evaluation_norms2,
-)
 from RichardsEqFEM.source.localevaluation.local_evaluation_new import (
     RichardsLocalEvaluation,
 )
@@ -341,17 +334,13 @@ class LN_alg:
         # Local pressure head values
         psi_local = np.array([self.psi_t[cn[i]] for i in range(3)])
 
+        # Local function values
         local_vals = self.hydraulics.function_evaluation_L(psi_local, Phi, dPhi)
 
         for j in range(P_El.num_dofs):
-            val1 = 0
+            val1 = np.sum(local_vals.theta_in_Q * (a[:, 2] * Phi[:][j]).reshape(-1, 1))
             val2 = 0
-            valalt1 = np.sum(
-                local_vals.theta_in_Q * (a[:, 2] * Phi[:][j]).reshape(-1, 1)
-            )
             for k in range(len(Phi)):
-
-                # val1 += local_vals.theta_in_Q[k]*a[k][2]*Phi[k][j]
 
                 vec = [(quadrature_pt)[0][k], (quadrature_pt)[1][k]]
                 q_i = J @ vec + c  # transformed quadrature points
@@ -363,7 +352,7 @@ class LN_alg:
                 )
 
             local_source[j] = 0.5 * val2 * det_J
-            local_saturation[j] = 0.5 * valalt1 * det_J
+            local_saturation[j] = 0.5 * val1 * det_J
 
         return local_source, local_saturation, cn
 
@@ -522,7 +511,7 @@ class LN_alg:
         psi_local = np.array([self.u_j_1[cn[i]] for i in range(3)])
         psi_local2 = np.array([self.u_j[cn[i]] for i in range(3)])
 
-        ## Evaluate functions locally
+        # Evaluate functions locally
         local_vals = self.hydraulics.function_evaluation_newtonnorm(
             psi_local, psi_local2, Phi, dPhi
         )
@@ -546,11 +535,7 @@ class LN_alg:
         return val
 
     # Estimation of C_N^j
-    def estimate_CN(self, K, K_prime, theta_prime, u):
-        x = sp.symbols("x")
-        # Lambdify functions
-        theta_prime = sp.lambdify([x], theta_prime)
-        K_prime_func = sp.lambdify([x], K_prime)
+    def estimate_CN(self, u):
 
         # Compute pointwise gradient
         h = 1 / self.d.x_part
@@ -565,16 +550,14 @@ class LN_alg:
 
         # Initialize
         C_array = np.zeros((len(u), 1))
-        theta_in_Q = np.zeros((len(u), 1))
-        K_in_Q = np.zeros((len(u), 1))
         # astype remeber
-        theta_prime_Q = np.zeros((len(u), 1))
-        K_d_theta = np.zeros((len(u), 1))
         K_prime_Q = np.zeros((len(u), 1), dtype=np.float32)
+
+        theta_in_Q = self.theta_np(np.ravel(u))
+        K_in_Q = self.K_np(np.ravel(theta_in_Q))
+        theta_prime_Q = self.theta_prime_np(np.ravel(u))
+
         for k in range(len(u)):
-            theta_in_Q[k] = self.theta(u[k].item())
-            K_in_Q[k] = K(theta_in_Q[k].item())
-            theta_prime_Q[k] = theta_prime(u[k].item())
 
             # Avoid discontinuity
             if np.abs(gradeta[k]).any() > 0.5:  # look at this tomorrow.....
@@ -583,12 +566,12 @@ class LN_alg:
             # C_N^j definition is almost everywhere, for the benchmark problem 5-6 individual points
             # causes C_N^j<2. Those points can be negelcted as the definition is almost everywhere
             # and the points are not measurable. (This criteria does not affect other examples)
-            if theta_prime_Q[k] == 0:  # or 0.395999<=theta_in_Q[k].item()<=0.396:
+            if math.isclose(theta_prime_Q[k], 0):  # or 0.395999<=theta_in_Q[k].item()<=0.396:
                 K_prime_Q[k] = 0
 
             else:
                 K_prime_Q[k] = (
-                    K_prime_func(theta_in_Q[k].item()) * theta_prime_Q[k]
+                    self.K_prime_np(theta_in_Q[k].item()) * theta_prime_Q[k]
                 ).astype(np.float16)
 
             # Compute C_N^j at every point
@@ -617,7 +600,7 @@ class LN_alg:
             self.CN = 0
         return C_array
 
-    def N_to_L_eta(self, w1, w2, K_prime, theta_prime):
+    def N_to_L_eta(self, w1, w2):
         """
 
 
@@ -635,10 +618,8 @@ class LN_alg:
         """
 
         CN = 0  # To speed up computations
-        # self.estimate_CN(self.d.K, K_prime, theta_prime, w1)
+        # self.estimate_CN(w1)
         # CN = self.CN
-        self.theta_prime = theta_prime
-        self.K_prime = K_prime
         a = 2 / (2 - CN)
 
         self.w1 = w1
@@ -662,6 +643,7 @@ class LN_alg:
 
     def norm_N_to_L_on_element(self, element_num):
 
+        # Fetch FE
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
 
         tic = time.time()
@@ -745,7 +727,7 @@ class LN_alg:
 
         return val, val2, val3
 
-    def L_to_N_eta(self, w1, w2, K_prime, theta_prime):
+    def L_to_N_eta(self, w1, w2):
         """
 
 
@@ -761,12 +743,9 @@ class LN_alg:
         Indicator for switch to Newton's method.
 
         """
-        self.estimate_CN(self.d.K, K_prime, theta_prime, w1)  # estimate C_N^i
+        self.estimate_CN(w1)  # estimate C_N^i
         self.CN = self.CN
         print(self.CN, "CN")
-        x = sp.symbols("x")
-        self.theta_prime = theta_prime
-        self.K_prime = K_prime
         a = 2 / (2 - self.CN)
         self.w1 = w1
         self.w2 = w2

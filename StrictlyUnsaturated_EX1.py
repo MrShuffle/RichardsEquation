@@ -182,7 +182,7 @@ if __name__ == "__main__":
     L_count_tot = 0
     N_count_tot = 0
 
-    scheme = LN_alg(L, dt, d, g, order, psi_t, K, theta, K_prime, theta_prime, f, theta_np,K_np, theta_prime_np, K_prime_np)
+    scheme = LN_alg(L, dt, d, g, order, psi_t, K, theta, K_prime, theta_prime, f, theta_np,K_np, theta_prime_np, K_prime_np, f)
 
     bcval = -4
     for j in range(timesteps):
@@ -215,7 +215,7 @@ if __name__ == "__main__":
                 N_count += 1  # Update Newton count
 
                 # Compute Newton to L-scheme switching indicators
-                scheme.N_to_L_eta(psi, psi_k, K_prime, theta_prime)
+                scheme.N_to_L_eta(psi, psi_k)
 
                 # Stopping criterion
                 valstop = scheme.linear_norm
@@ -240,7 +240,7 @@ if __name__ == "__main__":
                         ind = 0
 
                         # Compute L-scheme to Newton switching indicators
-                        scheme.L_to_N_eta(psi, psi_k, K_prime, theta_prime)
+                        scheme.L_to_N_eta(psi, psi_k)
 
                         psi_L_old = psi
                         valstop = scheme.linear_norm
@@ -264,9 +264,9 @@ if __name__ == "__main__":
                 L_count += 1  # Update L-scheme counter
 
                 # Estimate C_N^j
-                scheme.estimate_CN(K, K_prime, theta_prime, psi)
+                scheme.estimate_CN(psi)
                 # Compute L-scheme to Newton switching indicator
-                scheme.L_to_N_eta(psi, psi_k, K_prime, theta_prime)
+                scheme.L_to_N_eta(psi, psi_k)
 
                 # Stopping criterion
                 valstop = scheme.linear_norm
