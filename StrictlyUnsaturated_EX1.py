@@ -13,10 +13,11 @@ import scipy as sci
 import sympy as sp
 
 from RichardsEqFEM.source.basisfunctions.lagrange_element import finite_element
-from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import \
-    Local_to_Global_table
+from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import Local_to_Global_table
 from RichardsEqFEM.source.MatrixAssembly.Model_class_parallell import LN_alg
 from RichardsEqFEM.source.utils.boundary_conditions import dirichlet_BC
+
+import time
 
 # Van Genuchten parameteres
 
@@ -36,11 +37,8 @@ def theta_sp(u):
         (the_r + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2), u < 0),
         (the_s, u >= 0),
     )
-    # if u<0:
-    #     val= the_r+(the_s-the_r)*(1+(np.abs(-a_g*u))**n_g)**(-exp_2)
-    # else:
-    #     val=the_s
     return val
+
 
 def K_sp(thetaa):
     val = ((k_abs) * ((thetaa - the_r) / (the_s - the_r)) ** (1 / 2)) * (
@@ -61,26 +59,39 @@ def K_sp(thetaa):
 
     return val
 
+
 # Numpy versions (faster)
 def theta_np(u):
 
     return np.piecewise(
         u,
-        [u<0, u>=0],
-        [lambda u: the_r + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2), the_s]
+        [u < 0, u >= 0],
+        [
+            lambda u: the_r
+            + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2),
+            the_s,
+        ],
     )
 
+
 def theta_prime_np(u):
-    #NOTE: Created using sympy.diff applied to theta.
-    #val = sp.Piecewise((-0.132919732761843*sp.Abs(u)**1.9*sp.sign(u)/(0.177557751485229*sp.Abs(u)**2.9 + 1)**1.6551724137931, u < 0), (0, True))
+    # NOTE: Created using sympy.diff applied to theta.
+    # val = sp.Piecewise((-0.132919732761843*sp.Abs(u)**1.9*sp.sign(u)/(0.177557751485229*sp.Abs(u)**2.9 + 1)**1.6551724137931, u < 0), (0, True))
 
     val = np.piecewise(
-        u, 
-        [u < 0, u>=0],
-        [lambda u: -0.132919732761843*np.abs(u)**1.9*np.sign(u)/(0.177557751485229*np.abs(u)**2.9 + 1)**1.6551724137931, 0]
+        u,
+        [u < 0, u >= 0],
+        [
+            lambda u: -0.132919732761843
+            * np.abs(u) ** 1.9
+            * np.sign(u)
+            / (0.177557751485229 * np.abs(u) ** 2.9 + 1) ** 1.6551724137931,
+            0,
+        ],
     )
 
     return val
+
 
 def K_np(thetaa):
 
@@ -90,8 +101,38 @@ def K_np(thetaa):
 
     return val
 
+
 def K_prime_np(x):
-    return 0.0955879481815749*(1 - np.abs(np.abs(2.53807106598985*x - 0.065989847715736)**1.52631578947368 - 1)**0.655172413793103)**2/(x - 0.026)**0.5 - 0.970436022147969*(1 - np.abs(np.abs(2.53807106598985*x - 0.065989847715736)**1.52631578947368 - 1)**0.655172413793103)*(x - 0.026)**0.5*np.abs(2.53807106598985*x - 0.065989847715736)**0.526315789473684*np.sign(2.53807106598985*x - 0.065989847715736)*np.sign(np.abs(2.53807106598985*x - 0.065989847715736)**1.52631578947368 - 1)/np.abs(np.abs(2.53807106598985*x - 0.065989847715736)**1.52631578947368 - 1)**0.344827586206897
+    return (
+        0.0955879481815749
+        * (
+            1
+            - np.abs(
+                np.abs(2.53807106598985 * x - 0.065989847715736) ** 1.52631578947368 - 1
+            )
+            ** 0.655172413793103
+        )
+        ** 2
+        / (x - 0.026) ** 0.5
+        - 0.970436022147969
+        * (
+            1
+            - np.abs(
+                np.abs(2.53807106598985 * x - 0.065989847715736) ** 1.52631578947368 - 1
+            )
+            ** 0.655172413793103
+        )
+        * (x - 0.026) ** 0.5
+        * np.abs(2.53807106598985 * x - 0.065989847715736) ** 0.526315789473684
+        * np.sign(2.53807106598985 * x - 0.065989847715736)
+        * np.sign(
+            np.abs(2.53807106598985 * x - 0.065989847715736) ** 1.52631578947368 - 1
+        )
+        / np.abs(
+            np.abs(2.53807106598985 * x - 0.065989847715736) ** 1.52631578947368 - 1
+        )
+        ** 0.344827586206897
+    )
 
 
 # Source term
@@ -105,12 +146,15 @@ def f(t, x, y):
 
 if __name__ == "__main__":
 
+    tic0 = time.time()
+
     # # Compute derivatives
     # x = sp.symbols("x", real=True)
     # theta_prime = sp.diff(theta_sp(x), x)
     # K_prime = sp.diff(K_sp(x), x)
     # print(theta_prime)
     # print(K_prime)
+    # assert False
 
     # Define mesh partitions
     x_part = 40
@@ -171,7 +215,15 @@ if __name__ == "__main__":
     L_count_tot = 0
     N_count_tot = 0
 
-    scheme = LN_alg(L, dt, d, g, order, psi_t, theta_np, K_np, theta_prime_np, K_prime_np, f)
+    scheme = LN_alg(
+        L, dt, d, g, order, psi_t, theta_np, K_np, theta_prime_np, K_prime_np, f
+    )
+
+    time_assemble_and_solve = 0
+    time_N_to_L = 0
+    time_L_to_N = 0
+    time_CN = 0
+    time_linearization_error = 0
 
     bcval = -4
     for j in range(timesteps):
@@ -189,6 +241,7 @@ if __name__ == "__main__":
 
         while True:
 
+            tic = time.time()
             scheme.update_at_iteration(psi_k, ind, Switch)
             scheme.assemble(psi_k, Switch)
 
@@ -199,12 +252,17 @@ if __name__ == "__main__":
             psi = sci.sparse.linalg.spsolve(lhs, rhs)
 
             psi = np.resize(psi, (psi.shape[0], 1))
+            time_assemble_and_solve += time.time() - tic
+            print(f"CPU time for assemble and solve: {time.time() - tic}.")
 
             if Switch == True:
                 N_count += 1  # Update Newton count
 
                 # Compute Newton to L-scheme switching indicators
+                tic = time.time()
                 scheme.N_to_L_eta(psi, psi_k)
+                time_N_to_L += time.time() - tic
+                print(f"CPU time for N to L: {time.time() - tic}.")
 
                 # Stopping criterion
                 valstop = scheme.linear_norm
@@ -214,6 +272,7 @@ if __name__ == "__main__":
 
                     if ind == 1:  # Failure at first Newton iteration
 
+                        tic = time.time()
                         scheme.assemble(psi_k, Switch)
 
                         lhs = scheme.lhs
@@ -222,6 +281,8 @@ if __name__ == "__main__":
                         lhs, rhs = dirichlet_BC(bcval, Dirichlet_boundary, lhs, rhs, g)
 
                         psi = sci.sparse.linalg.spsolve(lhs, rhs)
+                        time_assemble_and_solve += time.time() - tic
+                        print("CPU time for assemble and solve: {time.time() - tic}.")
 
                         psi = np.resize(psi, (psi.shape[0], 1))
                         L_count += 1
@@ -229,7 +290,10 @@ if __name__ == "__main__":
                         ind = 0
 
                         # Compute L-scheme to Newton switching indicators
+                        tic = time.time()
                         scheme.L_to_N_eta(psi, psi_k)
+                        time_L_to_N += time.time() - tic
+                        print(f"CPU time of L to N: {time.time() - tic}.")
 
                         psi_L_old = psi
                         valstop = scheme.linear_norm
@@ -245,7 +309,10 @@ if __name__ == "__main__":
 
                 else:
                     Switch = True
+                    tic = time.time()
                     scheme.linearization_error(psi_k, psi - psi_k)
+                    time_linearization_error += time.time() - tic
+                    print(f"CPU time for linearization error {time.time() - tic}.")
                     valstop = scheme.linear_norm
                     ind = 0
             else:
@@ -253,9 +320,16 @@ if __name__ == "__main__":
                 L_count += 1  # Update L-scheme counter
 
                 # Estimate C_N^j
+                tic = time.time()
                 scheme.estimate_CN(psi)
+                time_CN += time.time() - tic
+                print(f"CPU time for CN: {time.time() - tic}.")
+
                 # Compute L-scheme to Newton switching indicator
+                tic = time.time()
                 scheme.L_to_N_eta(psi, psi_k)
+                time_L_to_N += time.time() - tic
+                print(f"CPU fime for L to N: {time.time() - tic}.")
 
                 # Stopping criterion
                 valstop = scheme.linear_norm
@@ -304,9 +378,16 @@ if __name__ == "__main__":
         flat_list = d.local_dofs_corners
 
         psi_plot = psi.copy()
-        plt.tricontourf(xcoords, ycoords, cn[:, flat_list], psi_plot, 40)
-        plt.colorbar()
-        plt.show()
+        if False:
+            plt.tricontourf(xcoords, ycoords, cn[:, flat_list], psi_plot, 40)
+            plt.colorbar()
+            plt.show()
 
     print("Total number of iterations", count_tot)
     print("Total", "Newton iterations", N_count_tot, "L-scheme iterations", L_count_tot)
+    print(f"CPU time assemble and solve {time_assemble_and_solve}.")
+    print(f"CPU time L to N {time_L_to_N}.")
+    print(f"CPU time N to L {time_N_to_L}.")
+    print(f"CPU time CN {time_CN}.")
+    print(f"CPU time linearzation error {time_linearization_error}.")
+    print(f"Total time {time.time() - tic0}.")
