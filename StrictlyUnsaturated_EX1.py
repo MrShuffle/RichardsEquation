@@ -75,6 +75,37 @@ def theta(u):
     #     val=the_s
     return val
 
+def theta_np(u):
+
+    return np.piecewise(
+        u,
+        [u<0, u>=0],
+        [lambda u: the_r + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2), the_s]
+    )
+
+def theta_prime_np(u):
+    #NOTE: Created using sympy.diff applied to theta.
+    #val = sp.Piecewise((-0.132919732761843*sp.Abs(u)**1.9*sp.sign(u)/(0.177557751485229*sp.Abs(u)**2.9 + 1)**1.6551724137931, u < 0), (0, True))
+
+    val = np.piecewise(
+        u, 
+        [u < 0, u>=0],
+        [lambda u: -0.132919732761843*np.abs(u)**1.9*np.sign(u)/(0.177557751485229*np.abs(u)**2.9 + 1)**1.6551724137931, 0]
+    )
+
+    return val
+
+def K_np(thetaa):
+
+    val = ((k_abs) * ((thetaa - the_r) / (the_s - the_r)) ** (1 / 2)) * (
+        1 - (1 - ((thetaa - the_r) / (the_s - the_r)) ** exp_1) ** exp_2
+    ) ** 2
+
+    return val
+
+def K_prime_np(x):
+    return 0.0955879481815749*(1 - np.abs(np.abs(2.53807106598985*x - 0.065989847715736)**1.52631578947368 - 1)**0.655172413793103)**2/(x - 0.026)**0.5 - 0.970436022147969*(1 - np.abs(np.abs(2.53807106598985*x - 0.065989847715736)**1.52631578947368 - 1)**0.655172413793103)*(x - 0.026)**0.5*np.abs(2.53807106598985*x - 0.065989847715736)**0.526315789473684*np.sign(2.53807106598985*x - 0.065989847715736)*np.sign(np.abs(2.53807106598985*x - 0.065989847715736)**1.52631578947368 - 1)/np.abs(np.abs(2.53807106598985*x - 0.065989847715736)**1.52631578947368 - 1)**0.344827586206897
+
 
 # Source term
 def f(t, x, y):
@@ -151,7 +182,7 @@ if __name__ == "__main__":
     L_count_tot = 0
     N_count_tot = 0
 
-    scheme = LN_alg(L, dt, d, g, order, psi_t, K, theta, K_prime, theta_prime, f)
+    scheme = LN_alg(L, dt, d, g, order, psi_t, K, theta, K_prime, theta_prime, f, theta_np,K_np, theta_prime_np, K_prime_np)
 
     bcval = -4
     for j in range(timesteps):

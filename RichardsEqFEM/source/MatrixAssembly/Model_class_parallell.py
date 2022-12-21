@@ -23,13 +23,32 @@ from RichardsEqFEM.source.localevaluation.local_evaluation import (
     localelement_function_evaluation_norms,
     localelement_function_evaluation_norms2,
 )
+from RichardsEqFEM.source.localevaluation.local_evaluation_new import (
+    RichardsLocalEvaluation,
+)
 from RichardsEqFEM.source.utils.operators import reference_to_local
 from scipy.sparse.coo import coo_matrix
 
 
 class LN_alg:
     def __init__(
-        self, L, dt, d, g, order, psi, K, theta, K_prime, theta_prime, f, Switch=False
+        self,
+        L,
+        dt,
+        d,
+        g,
+        order,
+        psi,
+        K,
+        theta,
+        K_prime,
+        theta_prime,
+        f,
+        theta_np,
+        K_np,
+        theta_prime_np,
+        K_prime_np,
+        Switch=False,
     ):
         """
         A posteriori estimate based adaptive switching between L-scheme and Newton
@@ -74,6 +93,15 @@ class LN_alg:
 
         # Build FE cache
         self._build_fe_cache()
+
+        # Model
+        self.hydraulics = RichardsLocalEvaluation(
+            theta_np, theta_prime_np, K_np, K_prime_np
+        )
+        self.theta_np = theta_np
+        self.theta_prime_np = theta_prime_np
+        self.K_np = K_np
+        self.K_prime_np = K_prime_np
 
         # Assemble mass matrix
         _data_mass = np.empty(d.numDataPts, dtype=np.double)
@@ -313,9 +341,8 @@ class LN_alg:
         # Local pressure head values
         psi_local = np.array([self.psi_t[cn[i]] for i in range(3)])
 
-        local_vals = localelement_function_evaluation_L(
-            self.d.K, self.d.theta, psi_local, Phi, dPhi
-        )
+        local_vals = self.hydraulics.function_evaluation_L(psi_local, Phi, dPhi)
+
         for j in range(P_El.num_dofs):
             val1 = 0
             val2 = 0
@@ -348,11 +375,9 @@ class LN_alg:
 
         # Local pressure head values
         psi_local = np.array([self.psi_k[cn[i]] for i in range(3)])
-        local_vals = localelement_function_evaluation(
-            self.d.K,
-            self.d.theta,
-            self.d.K_prime,
-            self.d.theta_prime,
+
+        # Local function evaluations
+        local_vals = self.hydraulics.function_evaluation(
             psi_local,
             Phi,
             dPhi,
@@ -435,10 +460,11 @@ class LN_alg:
 
         # Local pressure head values
         psi_local = np.array([self.psi_k[cn[0]], self.psi_k[cn[1]], self.psi_k[cn[2]]])
-        local_vals = localelement_function_evaluation_L(
-            self.d.K, self.d.theta, psi_local, Phi, dPhi
-        )
 
+        # Hydraulics evaluated
+        local_vals = self.hydraulics.function_evaluation_L(psi_local, Phi, dPhi)
+
+        # Local assembly
         local_perm = np.zeros((P_El.num_dofs, P_El.num_dofs))
         local_gravity = np.zeros((P_El.num_dofs, 1))
         local_saturation_k = np.zeros((P_El.num_dofs, 1))

@@ -90,11 +90,14 @@ class RichardsLocalEvaluation:
         val_Q = np.sum(u * Phi, axis=0)
 
         # Derivative of theta wrt psi
-        theta_in_Q = self.theta_func(np.ravel(val_Q))
-        K_in_Q = self.K_func(np.ravel(theta_in_Q))
+        theta_in_Q = self.theta_func(np.ravel(val_Q)).reshape(-1, 1)
+        K_in_Q = self.K_func(np.ravel(theta_in_Q)).reshape(-1, 1)
 
-        theta_prime_Q = self.theta_prime_func(np.ravel(val_Q))
-        K_prime_Q = np.multiply(self.K_prime_func(np.ravel(theta_in_Q)), theta_prime_Q)
+        theta_prime_Q = self.theta_prime_func(np.ravel(val_Q)).reshape(-1, 1)
+        K_prime_Q = np.multiply(
+            self.K_prime_func(np.ravel(theta_in_Q)).reshape(-1, 1),
+            theta_prime_Q.reshape(-1, 1),
+        )
 
         return LocalElementFunctionEvaluation(
             valgrad_Q, val_Q, theta_in_Q, K_in_Q, K_prime_Q, theta_prime_Q
@@ -118,8 +121,8 @@ class RichardsLocalEvaluation:
         """
         val_Q = np.sum(val * Phi, axis=0)
         valgrad_Q = np.tensordot(val, dPhi, axes=((0), (1)))[0]
-        theta_in_Q = self.theta_func(np.ravel(val_Q))
-        K_in_Q = self.K_func(np.ravel(theta_in_Q))
+        theta_in_Q = self.theta_func(np.ravel(val_Q)).reshape(-1, 1)
+        K_in_Q = self.K_func(np.ravel(theta_in_Q)).reshape(-1, 1)
 
         return FunctionEvaluation_L(valgrad_Q, val_Q, theta_in_Q, K_in_Q)
 
