@@ -13,14 +13,16 @@ import numpy as np
 import sympy as sp
 from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
 from RichardsEqFEM.source.basisfunctions.lagrange_element import (
-    finite_element, global_element_geometry)
+    finite_element,
+    global_element_geometry,
+)
 from RichardsEqFEM.source.localevaluation.local_evaluation import (
-    localelement_function_evaluation, localelement_function_evaluation_L,
-    localelement_function_evaluation_Lnorm,
+    localelement_function_evaluation,
+    localelement_function_evaluation_L,
     localelement_function_evaluation_newtonnorm,
     localelement_function_evaluation_norms,
     localelement_function_evaluation_norms2,
-    localelement_function_evaluation_P)
+)
 from RichardsEqFEM.source.utils.operators import reference_to_local
 from scipy.sparse.coo import coo_matrix
 
@@ -312,7 +314,7 @@ class LN_alg:
         psi_local = np.array([self.psi_t[cn[i]] for i in range(3)])
 
         local_vals = localelement_function_evaluation_L(
-            self.d.K, self.d.theta, psi_local, P_El
+            self.d.K, self.d.theta, psi_local, Phi, dPhi
         )
         for j in range(P_El.num_dofs):
             val1 = 0
@@ -347,7 +349,13 @@ class LN_alg:
         # Local pressure head values
         psi_local = np.array([self.psi_k[cn[i]] for i in range(3)])
         local_vals = localelement_function_evaluation(
-            self.d.K, self.d.theta, self.d.K_prime, self.d.theta_prime, psi_local, P_El
+            self.d.K,
+            self.d.theta,
+            self.d.K_prime,
+            self.d.theta_prime,
+            psi_local,
+            Phi,
+            dPhi,
         )
 
         local_perm = np.zeros((P_El.num_dofs, P_El.num_dofs))
@@ -428,7 +436,7 @@ class LN_alg:
         # Local pressure head values
         psi_local = np.array([self.psi_k[cn[0]], self.psi_k[cn[1]], self.psi_k[cn[2]]])
         local_vals = localelement_function_evaluation_L(
-            self.d.K, self.d.theta, psi_local, P_El
+            self.d.K, self.d.theta, psi_local, Phi, dPhi
         )
 
         local_perm = np.zeros((P_El.num_dofs, P_El.num_dofs))
@@ -490,7 +498,7 @@ class LN_alg:
 
         # Evaluate functions locally
         local_vals = localelement_function_evaluation_newtonnorm(
-            self.d.K, self.d.theta, self.d.theta_prime, psi_local, psi_local2, P_El
+            self.d.K, self.d.theta, self.d.theta_prime, psi_local, psi_local2, Phi, dPhi
         )
 
         R_h = np.dot((psi_local).T.reshape(len(psi_local)), Phi.T)
@@ -645,7 +653,8 @@ class LN_alg:
             psi_local2,
             psi_local,
             psi_local3,
-            P_El,
+            Phi,
+            dPhi,
         )
         # print(f"time 2: {time.time() - tic}")
 
@@ -756,14 +765,7 @@ class LN_alg:
             val2 += result[1]
             val3 += result[2]  # L-scheme linearization norm error
             val4 += result[3]
-        # for e in range(self.g.num_cells):
-        #     q,w,r,o = self.norm_L_to_N_on_element(e)
-        #     val += q
-        #     val2 +=w
-        #     val3+= r
-        #     val4+= o
 
-        # eta_L1 = np.sqrt(val4)
         self.linear_norm = np.sqrt(val3)
         self.eta_LtoL = 1 / self.linear_norm * np.sqrt(val4 + self.dt * val2)
         self.eta_LtoN = a / self.linear_norm * np.sqrt(val + self.dt * val2)
@@ -784,7 +786,8 @@ class LN_alg:
             psi_local2,
             psi_local,
             psi_local3,
-            P_El,
+            Phi,
+            dPhi,
         )
 
         R_h = np.dot((psi_local3).T.reshape(len(psi_local)), Phi.T)
