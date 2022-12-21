@@ -6,17 +6,9 @@ Created on Thu Aug 25 13:34:35 2022
 """
 
 import copy
-import time
 from collections import namedtuple
 
 import numpy as np
-import porepy as pp
-import sympy as sp
-from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
-from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import \
-    Local_to_Global_table
-from sympy import Function, Matrix, Symbol, simplify
-from sympy.tensor.array import derive_by_array
 
 LocalElementFunctionEvaluation = namedtuple(
     "LocalElementFunctionEvaluation",
@@ -63,7 +55,7 @@ FunctionEvaluationNewtonNorms = namedtuple(
 )
 
 
-class RichardsLocalEvaluation:
+class HydraulicsLocalEvaluation:
     def __init__(self, theta, theta_prime, K, K_prime):
         self.theta_func = copy.deepcopy(theta)
         self.theta_prime_func = copy.deepcopy(theta_prime)
@@ -72,14 +64,12 @@ class RichardsLocalEvaluation:
 
     def function_evaluation(self, u, Phi, dPhi):
         """
+        Evaluation of FE functions and constitutive laws.
+
         Parameters
         ----------
-        K : Permability -function of theta.
-        theta : Saturation -function of psi.
-        K_prime : Derivative of permability -function of theta.
-        theta_prime : Derivative of aturation -function of psi.
         u : a vector with psi value.
-        PK : PK element number of the class global_element_geometry(element,corners,g,order).
+        Phi, dPhi: Shape function and derivative.
 
         Returns
         -------
@@ -106,14 +96,12 @@ class RichardsLocalEvaluation:
 
     def function_evaluation_L(self, val, Phi, dPhi):
         """
-
+        Evaluation of FE functions and constitutive laws.
 
         Parameters
         ----------
-        K : Permability -function of theta.
-        theta : Saturation -function of psi.
-        u : a vector with psi value.
-        PK : PK element number of the class global_element_geometry(element,corners,g,order).
+        val: a vector with psi value.
+        Phi, dPhi: Shape function and derivative.
 
         Returns
         -------
@@ -129,12 +117,12 @@ class RichardsLocalEvaluation:
 
     def function_evaluation_norms(self, val, val2, val3, Phi, dPhi):
         """
+        Evaluation of FE functions and constitutive laws.
+
         Parameters
         ----------
-        K : Permability -function of theta.
-        theta : Saturation -function of psi.
-        u : a vector with psi value.
-        PK : PK element number of the class global_element_geometry(element,corners,g,order).
+        val, val2, val3 : a vector with psi value.
+        Phi, dPhi: Shape function and derivative.
 
         Returns
         -------
@@ -170,14 +158,13 @@ class RichardsLocalEvaluation:
 
     def function_evaluation_norms2(self, val, val2, val3, Phi, dPhi):
         """
+        Evaluation of FE functions and constitutive laws.
 
 
         Parameters
         ----------
-        K : Permability -function of theta.
-        theta : Saturation -function of psi.
-        u : a vector with psi value.
-        PK : PK element number of the class global_element_geometry(element,corners,g,order).
+        val, val2, val3 : a vector with psi value.
+        Phi, dPhi: Shape function and derivative.
 
         Returns
         -------
@@ -222,14 +209,12 @@ class RichardsLocalEvaluation:
 
     def function_evaluation_newtonnorm(self, u, u2, Phi, dPhi):
         """
-
+        Evaluation of FE functions and constitutive laws.
 
         Parameters
         ----------
-        K : Permability -function of theta.
-        theta : Saturation -function of psi.
-        u : a vector with psi value.
-        PK : PK element number of the class global_element_geometry(element,corners,g,order).
+        u, u2 : a vector with psi value.
+        Phi, dPhi: Shape function and derivative.
 
         Returns
         -------
