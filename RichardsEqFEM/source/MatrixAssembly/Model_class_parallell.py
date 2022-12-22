@@ -9,13 +9,17 @@ import math
 from multiprocessing import Pool
 
 import numpy as np
-from RichardsEqFEM.source.basisfunctions.lagrange_element import global_element_geometry
-from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
-from RichardsEqFEM.source.localevaluation.local_evaluation import (
-    HydraulicsLocalEvaluation,
-)
-from RichardsEqFEM.source.utils.operators import reference_to_local
 from scipy.sparse.coo import coo_matrix
+
+from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
+from RichardsEqFEM.source.basisfunctions.lagrange_element import \
+    global_element_geometry
+from RichardsEqFEM.source.localevaluation.local_evaluation import \
+    HydraulicsLocalEvaluation
+from RichardsEqFEM.source.utils.operators import reference_to_local
+
+# Module containing the local assembly for the L-scheme and Newton's method,
+# as well as all switching criteria for the adaptive algorithm.
 
 
 class LN_alg:
@@ -58,12 +62,15 @@ class LN_alg:
         None.
 
         """
+        # Cache the nonlinearities
         d.Newton_method(K, theta, K_prime, theta_prime, f)
 
+        # Cache parameters
         self.L = L
         self.dt = dt
         self.f = f
 
+        # Cache grid and FE order
         self.g = g
         self.d = d
         self.order = order
@@ -88,23 +95,26 @@ class LN_alg:
         _data_mass = np.empty(d.numDataPts, dtype=np.double)
         n = 0
 
+        # Local assembly for all elements
         pool = Pool()
         elements_list = list(range(g.num_cells))
-
         results = pool.map(self.local_mass_assembly, elements_list)
 
+        # Collect the results
         for result in results:
-
             for k, l in np.ndindex(d.element.num_dofs, d.element.num_dofs):
-
                 _data_mass[n] = result[k, l]
                 n += 1
 
+        # Build matrix
         mass_m = coo_matrix((_data_mass, (d.row, d.col))).tocsr()
-
         self.mass_matrix = mass_m
 
     def _build_fe_cache(self):
+        """
+        Build cache of FE functions for reuse in each iteration.
+        """
+
         self.fe_cache = []
         for element_num in range(self.g.num_cells):
 
@@ -123,20 +133,28 @@ class LN_alg:
             [J, c, J_inv] = reference_to_local(P_El.element_coord)
             det_J = np.abs(np.linalg.det(J))
 
+            # Shape functions and derivative
             Phi = P_El.phi_eval(self.d.quad_pts)
             dPhi = P_El.grad_phi_eval(self.d.quad_pts)
 
+            # Gauss quadrature
             a = gauss_quadrature_points(2)
 
             # Collect results
             self.fe_cache.append((Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a))
 
     def update_at_iteration(self, psi_k, ind, Switch):
+        """
+        Setup for one iteratoin of Newton's/L-scheme method, depending on Switch. If True, apply Newton.
+        """
 
+        # Fetch previous iterate
         self.psi_k = psi_k
 
         if Switch:
+            # Newton:
 
+            # Initialize data structure
             self.sat_matrix_k = np.zeros((self.d.total_geometric_pts, 1))
             self.gravity_vector = np.zeros((self.d.total_geometric_pts, 1))
 
@@ -148,6 +166,7 @@ class LN_alg:
             _data_J_grav = []
             pool = Pool()
 
+            # Assemble matrices for Newton's method
             elements_list = list(range(self.g.num_cells))
             results = pool.map(self.local_Newtonscheme_assembly, elements_list)
 
@@ -167,37 +186,29 @@ class LN_alg:
                         self.gravity_vector[result[-1][i]] + result[1][i]
                     )
 
+            # Buidl matrix
             _data_perm = np.concatenate(_data_perm)
             _data_J_perm = np.concatenate(_data_J_perm)
             _data_J_sat = np.concatenate(_data_J_sat)
             _data_J_grav = np.concatenate(_data_J_grav)
 
-            self.perm_matrix = coo_matrix(
-                (_data_perm, (self.d.row, self.d.col))
-            )  # .tocsr()
-            self.J_perm_matrix = coo_matrix(
-                (_data_J_perm, (self.d.row, self.d.col))
-            )  # .tocsr()
-            self.J_sat_matrix = coo_matrix(
-                (_data_J_sat, (self.d.row, self.d.col))
-            )  # .tocsr()
-            self.J_gravity_matrix = coo_matrix(
-                (_data_J_grav, (self.d.row, self.d.col))
-            )  # .tocsr()
+            self.perm_matrix = coo_matrix((_data_perm, (self.d.row, self.d.col)))
+            self.J_perm_matrix = coo_matrix((_data_J_perm, (self.d.row, self.d.col)))
+            self.J_sat_matrix = coo_matrix((_data_J_sat, (self.d.row, self.d.col)))
+            self.J_gravity_matrix = coo_matrix((_data_J_grav, (self.d.row, self.d.col)))
 
         else:
-            self.psi_k = psi_k
+            # L-scheme
+
             # Initalize matrices
-            # self.perm_matrix    = np.zeros((self.d.total_geometric_pts, self.d.total_geometric_pts))
             self.sat_matrix_k = np.zeros((self.d.total_geometric_pts, 1))
             self.gravity_vector = np.zeros((self.d.total_geometric_pts, 1))
             _data_perm = np.empty(self.d.numDataPts, dtype=np.double)
 
-            # element = finite_element(self.order)
             n = 0
 
+            # Local assembly
             pool = Pool()
-
             elements_list = list(range(self.g.num_cells))
             results = pool.map(self.local_Lscheme_assembly, elements_list)
 
@@ -219,23 +230,30 @@ class LN_alg:
                         self.gravity_vector[result[-1][i]] + result[1][i]
                     )
 
+            # Global matrix
             self.perm_matrix = coo_matrix(
                 (_data_perm, (self.d.row, self.d.col))
             ).tocsr()
 
     def update_at_newtime(self, psi_t, t):
+        """
+        Assembly of constant terms (for each time step).
+        """
 
         # Initalize matrices
         self.sat_matrix_t = np.zeros((self.d.total_geometric_pts, 1))
         self.source_vector = np.zeros((self.d.total_geometric_pts, 1))
 
+        # Fetch time and current solution
         self.time = t
         self.psi_t = psi_t
-        # self.psi_k = psi_t
+
+        # Local assembly
         pool = Pool()
         elements_list = list(range(self.g.num_cells))
         results = pool.map(self.local_source_saturation_assembly, elements_list)
 
+        # Collect the results
         for result in results:
 
             for i in range(len(result[-1])):
@@ -247,10 +265,16 @@ class LN_alg:
                     self.source_vector[result[-1][i]] + result[0][i]
                 )
 
-    # Assemble lhs and rhs of either L-scheme of Newton's method
     def assemble(self, psi_k, Switch):
+        """
+        Assemble lhs and rhs of either L-scheme of Newton's method
+        """
+
+        # Global assemble routine, combining all contributions to build left and right
+        # hand sides. Use non-incremental formulation.
 
         if Switch:
+            # Newton
             self.lhs = (
                 self.J_sat_matrix
                 + self.dt * self.perm_matrix
@@ -268,6 +292,7 @@ class LN_alg:
             )
 
         else:
+            # L-scheme
 
             self.lhs = self.L * self.mass_matrix + self.dt * self.perm_matrix
             self.rhs = (
@@ -278,8 +303,10 @@ class LN_alg:
                 - self.dt * self.gravity_vector
             )
 
-    # Local mass matrix assembly
     def local_mass_assembly(self, element_num):
+        """
+        Local mass matrix assembly
+        """
 
         # Fetch FE info
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
@@ -292,8 +319,11 @@ class LN_alg:
 
         return local_mass
 
-    # Local assembly of source term at time t and <theta(psi),phi> which is also a vector
     def local_source_saturation_assembly(self, element_num):
+        """
+        Local assembly of source term at time t and <theta(psi),phi> which is also a vector
+        """
+
         # Fetch FE
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
         quadrature_points = a[:, 0:2]
@@ -309,6 +339,7 @@ class LN_alg:
         # Local function values
         local_vals = self.hydraulics.function_evaluation_L(psi_local, Phi, dPhi)
 
+        # Construct the local verctor from different FE contributions
         for j in range(P_El.num_dofs):
             val1 = np.sum(local_vals.theta_in_Q * (a[:, 2] * Phi[:][j]).reshape(-1, 1))
             val2 = 0
@@ -328,11 +359,14 @@ class LN_alg:
 
         return local_source, local_saturation, cn
 
-    # Local assembly of <theta(psi_k),phi>, <K(psi_k)dPhi,dPhi>, <K(psi_k)e_z,dPhi>, <K'(psi_k)e_z,dPhi> and <K'(psi_k) nabla(psi_k),dPhi>
     def local_Newtonscheme_assembly(self, element_num):
+        """
+        Local assembly of <theta(psi_k),phi>, <K(psi_k)dPhi,dPhi>, <K(psi_k)e_z,dPhi>, <K'(psi_k)e_z,dPhi> and <K'(psi_k) nabla(psi_k),dPhi>
+        """
 
         # Fetch FE
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
+        transform = J_inv @ J_inv.T
 
         # Local pressure head values
         psi_local = np.array([self.psi_k[cn[i]] for i in range(3)])
@@ -344,6 +378,7 @@ class LN_alg:
             dPhi,
         )
 
+        # Data structures
         local_perm = np.zeros((P_El.num_dofs, P_El.num_dofs))
         local_gravity = np.zeros((P_El.num_dofs, 1))
         local_saturation_k = np.zeros((P_El.num_dofs, 1))
@@ -351,8 +386,7 @@ class LN_alg:
         local_J_gravity = np.zeros((P_El.num_dofs, P_El.num_dofs))
         local_J_saturation = np.zeros((P_El.num_dofs, P_El.num_dofs))
 
-        transform = J_inv @ J_inv.T
-
+        # Build contributions to Newton's method
         for l in range(len(Phi)):
 
             local_perm += (
@@ -413,11 +447,14 @@ class LN_alg:
             cn,
         )
 
-    # Local assembly of <theta(psi_k),phi>, <K(psi_k)dPhi,dPhi>, <K(psi_k)e_z,dPhi>
     def local_Lscheme_assembly(self, element_num):
+        """
+        Local assembly of <theta(psi_k),phi>, <K(psi_k)dPhi,dPhi>, <K(psi_k)e_z,dPhi>
+        """
 
         # Fetch FE
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
+        transform = J_inv @ J_inv.T
 
         # Local pressure head values
         psi_local = np.array([self.psi_k[cn[i]] for i in range(3)])
@@ -430,8 +467,7 @@ class LN_alg:
         local_gravity = np.zeros((P_El.num_dofs, 1))
         local_saturation_k = np.zeros((P_El.num_dofs, 1))
 
-        transform = J_inv @ J_inv.T
-
+        # Single contributions to L-scheme
         for j in range(3):
             local_saturation_k[j] = np.sum(
                 local_vals.theta_in_Q * (a[:, 2] * Phi[:][j]).reshape(-1, 1)
@@ -475,6 +511,9 @@ class LN_alg:
         self.linear_norm = np.sqrt(val)
 
     def error_on_element(self, element_num):
+        """
+        Computes error on each element.
+        """
 
         # Fetch FE
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
@@ -506,8 +545,10 @@ class LN_alg:
 
         return val
 
-    # Estimation of C_N^j
     def estimate_CN(self, u):
+        """
+        Estimation of C_N^j
+        """
 
         # Compute pointwise gradient
         h = 1 / self.d.x_part
@@ -522,13 +563,14 @@ class LN_alg:
 
         # Initialize
         C_array = np.zeros((len(u), 1))
-        # astype remeber
         K_prime_Q = np.zeros((len(u), 1), dtype=np.float32)
 
+        # Evaluate hydraulics
         theta_in_Q = self.theta(np.ravel(u))
         K_in_Q = self.K(np.ravel(theta_in_Q))
         theta_prime_Q = self.theta_prime(np.ravel(u))
 
+        # Compute further terms in the estimate
         for k in range(len(u)):
 
             # Avoid discontinuity
@@ -576,14 +618,12 @@ class LN_alg:
 
     def N_to_L_eta(self, w1, w2):
         """
-
+        Compute the switch criterion from Newton to L-scheme.
 
         Parameters
         ----------
         w1 : psi^(k).
         w2 : psi^(k-1).
-        K_prime : Derivative of permability.
-        theta_prime : Derivative of stauration.
 
         Returns
         -------
@@ -591,14 +631,18 @@ class LN_alg:
 
         """
 
+        # Guess CN
         CN = 0  # To speed up computations
         # self.estimate_CN(w1)
         # CN = self.CN
         a = 2 / (2 - CN)
 
+        # Fetch arguments
         self.w1 = w1
         self.w2 = w2
         self.diff = w1 - w2
+
+        # Assemble switch criterion
         pool = Pool(8)
         elements_list = list(range(self.g.num_cells))
         results = pool.map(self.norm_N_to_L_on_element, elements_list)
@@ -612,15 +656,17 @@ class LN_alg:
             val2 += result[1]
             val3 += result[2]
 
+        # Determine final scalar global criterion
         self.linear_norm = np.sqrt(val3)
         self.eta_NtoL = a / self.linear_norm * np.sqrt(val + self.dt * val2)
 
     def norm_N_to_L_on_element(self, element_num):
-
+        """
+        Auxiliary for N_to_L_eta.
+        """
         # Fetch FE
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
-
-        # Evaluate basis functions
+        wi = self.d.quad_weights * det_J
 
         # Local Values
         psi_local = np.array([self.w2[cn[i]] for i in range(3)])
@@ -635,8 +681,6 @@ class LN_alg:
         )
 
         R_h = np.dot((psi_local3).T.reshape(3), Phi.T)
-
-        wi = self.d.quad_weights * det_J
 
         K_nonzero = [
             k
@@ -702,31 +746,35 @@ class LN_alg:
 
     def L_to_N_eta(self, w1, w2):
         """
-
+        Compute the switch criterion from L-scheme to Newton.
 
         Parameters
         ----------
         w1 : psi^(k).
         w2 : psi^(k-1).
-        K_prime : Derivative of permability.
-        theta_prime : Derivative of stauration.
 
         Returns
         -------
         Indicator for switch to Newton's method.
 
         """
-        self.estimate_CN(w1)  # estimate C_N^i
+        # Estimate CN
+        self.estimate_CN(w1)
         self.CN = self.CN
         print(self.CN, "CN")
         a = 2 / (2 - self.CN)
+
+        # Fetch data
         self.w1 = w1
         self.w2 = w2
         self.diff = self.w1 - self.w2
+
+        # Local assembly
         pool = Pool(8)
         elements_list = list(range(self.g.num_cells))
         results = pool.map(self.norm_L_to_N_on_element, elements_list)
 
+        # Collection of results
         val = 0
         val2 = 0
         val3 = 0
@@ -739,18 +787,25 @@ class LN_alg:
             val3 += result[2]  # L-scheme linearization norm error
             val4 += result[3]
 
+        # Determine final global scalar
         self.linear_norm = np.sqrt(val3)
         self.eta_LtoL = 1 / self.linear_norm * np.sqrt(val4 + self.dt * val2)
         self.eta_LtoN = a / self.linear_norm * np.sqrt(val + self.dt * val2)
 
     def norm_L_to_N_on_element(self, element_num):
+        """
+        Auxiliary for L_to_N_eta.
+        """
 
         # Fetch FE
         Phi, dPhi, P_El, J, c, J_inv, det_J, cn, a = self.fe_cache[element_num]
 
+        # Local solution
         psi_local = np.array([self.w2[cn[i]] for i in range(3)])
         psi_local2 = np.array([self.w1[cn[i]] for i in range(3)])
         psi_local3 = np.array([self.diff[cn[i]] for i in range(3)])
+
+        # Local function evaluations
         local_vals = self.hydraulics.function_evaluation_norms(
             psi_local2,
             psi_local,
@@ -833,4 +888,7 @@ class LN_alg:
         return val, val2, val3, val4
 
     def update_L(self, L):
+        """
+        Update of the L-scheme parameter.
+        """
         self.L = L
