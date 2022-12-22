@@ -2,13 +2,12 @@
 
 This repositoy contains the implementation of all examples shown and discussed in the article:
 
-Stokke, J.S., Storvik, E., Mitra, K., Both, J.W., and Radu, F.A., An Adaptive and Robust Algorithm to Switch between Linearization Schemes for Nonlinear Diffusion through Porous Domains.
+Stokke, J.S., Storvik, E., Mitra, K., Both, J.W., and Radu, F.A., An adaptive solution strategy for Richards' equation
 
 # TODO add reference to arxiv when published.
 
 ---
 
-# Install PorePy
 The code in this repository is using PorePy (https://github.com/pmgbergen/porepy)
 for managing grids and data structures. For an introduction to PorePy, see the
 following reference:

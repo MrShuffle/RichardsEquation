@@ -9,10 +9,11 @@ import math
 
 import numpy as np
 import porepy as pp
-
 from RichardsEqFEM.source.basisfunctions.Gauss_quadrature_points import *
 from RichardsEqFEM.source.basisfunctions.lagrange_element import (
-    finite_element, global_element_geometry)
+    finite_element,
+    global_element_geometry,
+)
 
 
 # Local -> Global node numbering lookup table
