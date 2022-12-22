@@ -5,6 +5,9 @@ Created on Mon Oct 31 11:53:17 2022
 @author: jakob
 """
 
+# This file contains the script to run Example 1 for a fixed setup (mesh, timestep etc.)
+
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,14 +16,14 @@ import scipy as sci
 import sympy as sp
 
 from RichardsEqFEM.source.basisfunctions.lagrange_element import finite_element
-from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import Local_to_Global_table
+from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import \
+    Local_to_Global_table
 from RichardsEqFEM.source.MatrixAssembly.Model_class_parallell import LN_alg
 from RichardsEqFEM.source.utils.boundary_conditions import dirichlet_BC
 
-import time
+# ! ---- Hydraulic properties
 
 # Van Genuchten parameteres
-
 a_g = 0.551
 n_g = 2.9
 k_abs = 0.12
@@ -30,7 +33,7 @@ exp_1 = n_g / (n_g - 1)
 exp_2 = (n_g - 1) / n_g
 
 
-# Sympy version
+# Sympy versions of saturation and mobility
 def theta_sp(u):
 
     val = sp.Piecewise(
@@ -60,7 +63,7 @@ def K_sp(thetaa):
     return val
 
 
-# Numpy versions (faster)
+# Numpy versions (faster) of saturation and mobility
 def theta_np(u):
 
     return np.piecewise(
@@ -144,11 +147,15 @@ def f(t, x, y):
     return val
 
 
+# ! ---- Main script
+
 if __name__ == "__main__":
 
     tic0 = time.time()
 
-    # # Compute derivatives
+    # ! ---- Preliminaries
+
+    # # Compute derivatives and print for determining the numpy versions above.
     # x = sp.symbols("x", real=True)
     # theta_prime = sp.diff(theta_sp(x), x)
     # K_prime = sp.diff(K_sp(x), x)
@@ -156,16 +163,22 @@ if __name__ == "__main__":
     # print(K_prime)
     # assert False
 
+    # ! ---- Mesh
+
     # Define mesh partitions
     x_part = 40
     y_part = 40
+
     # Physical dimensions
     phys_dim = [1, 1]
+
     # Create grid
     g = pp.StructuredTriangleGrid(np.array([x_part, y_part]), phys_dim)
     g.compute_geometry()
 
     coordinates = g.nodes[0:2]
+
+    # ! ---- FEM
 
     order = 1  # Order of polynomial basis
 
@@ -173,7 +186,7 @@ if __name__ == "__main__":
     element = finite_element(order)
     d = Local_to_Global_table(g, element, x_part, y_part)
 
-    # Vectorize u_h
+    # Initialize the FE solution
     u_h = np.zeros((d.total_geometric_pts, 1))
 
     for k in range(d.total_geometric_pts):
@@ -182,10 +195,12 @@ if __name__ == "__main__":
         else:
             u_h[k] = -coordinates[1][k] - 1 / 4
 
-    # Initalize
+    # Initalize auxiliary functions (iterates, etc.)
     psi_k = u_h.copy()
     psi_t = u_h.copy()
     psi_L_old = u_h.copy()
+
+    # ! ---- Boundary conditions
 
     # Extract boundary nodes
     b_nodes = d.boundary
@@ -201,45 +216,60 @@ if __name__ == "__main__":
 
     Dirichlet_boundary = np.flip(Dirichlet_boundary)
 
+    # Define boundary value
+    bcval = -4
+
+    # ! ---- Time discretization
     timesteps = 1
     t = 0
     dt = 0.01
 
+    # ! ---- Solver parameters
     L = 0.1
-
     TOL = 10 ** (-7)
 
-    testL = np.zeros((1000, 1))
-    store = np.zeros((1000, 1))
-    count_tot = 0
-    L_count_tot = 0
-    N_count_tot = 0
-
+    # ! ---- Solver
     scheme = LN_alg(
         L, dt, d, g, order, psi_t, theta_np, K_np, theta_prime_np, K_prime_np, f
     )
 
+    # ! ---- Statistics
+
+    # Iteratoin counters
+    count_tot = 0
+    L_count_tot = 0
+    N_count_tot = 0
+
+    # Time
     time_assemble_and_solve = 0
     time_N_to_L = 0
     time_L_to_N = 0
     time_CN = 0
     time_linearization_error = 0
 
-    bcval = -4
+    # ! ---- Time loop
+
     for j in range(timesteps):
+
+        # ! ---- Preliminaries
+
         # Single timestep counter
         count = 0
         L_count = 0
         N_count = 0
         ind = 0
 
-        # Set Switch to false
+        # Set Switch to false, i.e., start with L-scheme
         Switch = False
 
-        t = t + dt  # Update time
+        # Update time
+        t = t + dt
         scheme.update_at_newtime(psi_t, t)
 
+        # ! ---- Nonlinear iterations
         while True:
+
+            # ! ---- Linearization step
 
             tic = time.time()
             scheme.update_at_iteration(psi_k, ind, Switch)
@@ -255,7 +285,9 @@ if __name__ == "__main__":
             time_assemble_and_solve += time.time() - tic
             print(f"CPU time for assemble and solve: {time.time() - tic}.")
 
-            if Switch == True:
+            # ! ---- Adaptive scheme
+
+            if Switch:
                 N_count += 1  # Update Newton count
 
                 # Compute Newton to L-scheme switching indicators
@@ -270,8 +302,9 @@ if __name__ == "__main__":
                 if scheme.eta_NtoL > 1:
                     Switch = False
 
-                    if ind == 1:  # Failure at first Newton iteration
+                    if ind == 1:
 
+                        # Failure at first Newton iteration - apply L-scheme step
                         tic = time.time()
                         scheme.assemble(psi_k, Switch)
 
@@ -295,25 +328,39 @@ if __name__ == "__main__":
                         time_L_to_N += time.time() - tic
                         print(f"CPU time of L to N: {time.time() - tic}.")
 
-                        psi_L_old = psi
+                        # Cache the latest L-scheme solution
+                        psi_L_old = psi.copy()
+
+                        # Stopping criterion
                         valstop = scheme.linear_norm
 
                         if scheme.eta_LtoN < 1.5:
+                            # Switch to Newton in the next iteration
                             Switch = True
                             ind = 1
                         else:
+                            # Switch to L-scheme in the next iteration
                             Switch = False
-                    else:  # Reset to last L-scheme iteration
+                    else:
+
+                        # Reset to last L-scheme iteration
                         ind = 1
-                        psi = psi_L_old
+                        psi = psi_L_old.copy()
 
                 else:
+                    # Switch to Newton's method in the next iteration
                     Switch = True
                     tic = time.time()
+
+                    # Determine the linearization error
                     scheme.linearization_error(psi_k, psi - psi_k)
                     time_linearization_error += time.time() - tic
                     print(f"CPU time for linearization error {time.time() - tic}.")
+
+                    # Stopping criterion
                     valstop = scheme.linear_norm
+
+                    # Prepare for the next iteration
                     ind = 0
             else:
 
@@ -340,45 +387,50 @@ if __name__ == "__main__":
                     psi = psi_t
 
                 elif scheme.CN >= 2:
+                    # Switch to L-scheme
                     Switch = False
                     ind = 1
 
                 elif scheme.eta_LtoN < 1.5:
+                    # Switch to Newton
                     Switch = True
                     ind = 1
                 else:
+                    # Switch to L-scheme
                     Switch = False
 
             # Update counter
             count = count + 1
 
             print("Iteration dependent norm:", valstop)
-            if valstop <= TOL:  # +TOL*np.linalg.norm(psi):
+            if valstop <= TOL:
                 break
             else:
                 psi_k = psi.copy()
 
+        # Management of iteration counts
         print("Total number of iterations: ", count)
         print("Newton iterations", N_count, "L-scheme iterations", L_count)
         count_tot = count_tot + count
         L_count_tot = L_count_tot + L_count
         N_count_tot = N_count_tot + N_count
+
+        # Propagate the solution in time
         psi_t = psi.copy()
         psi_k = psi.copy()
 
-        # Plotting #
-        psi = psi.squeeze()
-        # Extract geometric information
-        coordinates = g.nodes
-        xcoords, ycoords = coordinates[0:2]
-        elements = g.cell_nodes()
-
-        # local to global map
-        cn = d.mapping.T
-        flat_list = d.local_dofs_corners
-
-        psi_plot = psi.copy()
+        # Plotting
         if False:
+            psi = psi.squeeze()
+
+            # Extract geometric information
+            coordinates = g.nodes
+            xcoords, ycoords = coordinates[0:2]
+            elements = g.cell_nodes()
+            cn = d.mapping.T
+            flat_list = d.local_dofs_corners
+
+            psi_plot = psi.copy()
             plt.tricontourf(xcoords, ycoords, cn[:, flat_list], psi_plot, 40)
             plt.colorbar()
             plt.show()
