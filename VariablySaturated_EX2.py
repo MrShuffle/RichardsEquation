@@ -18,6 +18,8 @@ from RichardsEqFEM.source.LocalGlobalMapping.map_P1 import \
 from RichardsEqFEM.source.MatrixAssembly.Model_class_parallell import LN_alg
 from RichardsEqFEM.source.utils.boundary_conditions import dirichlet_BC
 
+import time
+
 # Van Genuchten parameteres
 a_g = 0.95
 n_g = 2.9
@@ -27,25 +29,14 @@ the_s = 0.42
 exp_1 = n_g / (n_g - 1)
 exp_2 = (n_g - 1) / n_g
 
-
+# Sympy version
 def theta_sp(u):
 
     val = sp.Piecewise(
-        (
-            the_r
-            + (the_s - the_r)
-            * (
-                sp.functions.elementary.complexes.Abs(
-                    1 + (sp.functions.elementary.complexes.Abs(-a_g * u)) ** n_g
-                )
-            )
-            ** (-exp_2),
-            u < 0,
-        ),
+        (the_r + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2), u < 0),
         (the_s, u >= 0),
     )
     return val
-
 
 def K_sp(thetaa):
     val = ((k_abs) * ((thetaa - the_r) / (the_s - the_r)) ** (1 / 2)) * (
@@ -66,24 +57,28 @@ def K_sp(thetaa):
 
     return val
 
+# Numpy versions (faster)
+def theta_np(u):
 
-def K(thetaa):
+    return np.piecewise(
+        u,
+        [u<0, u>=0],
+        [lambda u: the_r + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2), the_s]
+    )
+
+def theta_prime_np(u):
+    return np.piecewise(u, [u < 0, u>= 0], [lambda u: -0.645131545005374*np.abs(u)**1.9*np.sign(u)/(0.861784056913403*np.abs(u)**2.9 + 1)**1.6551724137931, 0])
+
+def K_np(thetaa):
+
     val = ((k_abs) * ((thetaa - the_r) / (the_s - the_r)) ** (1 / 2)) * (
         1 - (1 - ((thetaa - the_r) / (the_s - the_r)) ** exp_1) ** exp_2
     ) ** 2
 
     return val
 
-
-def theta(u):
-
-    val = sp.Piecewise(
-        (the_r + (the_s - the_r) * (1 + (np.abs(-a_g * u)) ** n_g) ** (-exp_2), u < 0),
-        (the_s, u >= 0),
-    )
-
-    return val
-
+def K_prime_np(theta):
+    return 0.0955879481815749*(1 - np.abs(np.abs(2.53807106598985*theta - 0.065989847715736)**1.52631578947368 - 1)**0.655172413793103)**2/(theta - 0.026)**0.5 - 0.970436022147969*(1 - np.abs(np.abs(2.53807106598985*theta - 0.065989847715736)**1.52631578947368 - 1)**0.655172413793103)*(theta - 0.026)**0.5*np.abs(2.53807106598985*theta - 0.065989847715736)**0.526315789473684*np.sign(2.53807106598985*theta - 0.065989847715736)*np.sign(np.abs(2.53807106598985*theta - 0.065989847715736)**1.52631578947368 - 1)/np.abs(np.abs(2.53807106598985*theta - 0.065989847715736)**1.52631578947368 - 1)**0.344827586206897
 
 # Source term
 def f(t, x, y):
@@ -96,10 +91,15 @@ def f(t, x, y):
 
 if __name__ == "__main__":
 
-    # Compute derivatives
-    x = sp.symbols("x", real=True)
-    theta_prime = sp.diff(theta_sp(x), x)
-    K_prime = sp.diff(K_sp(x), x)
+    tic = time.time()
+
+    # # Compute derivatives
+    # x = sp.symbols("x", real=True)
+    # theta_prime = sp.diff(theta_sp(x), x)
+    # K_prime = sp.diff(K_sp(x), x)
+    # print(theta_prime)
+    # print(K_prime)
+    # assert False
 
     # Define mesh partitions
     x_part = 80
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     N_count_tot = 0
 
     # Initalize scheme
-    scheme = LN_alg(L, dt, d, g, order, psi_t, K, theta, K_prime, theta_prime, f)
+    scheme = LN_alg(L, dt, d, g, order, psi_t, theta_np, K_np, theta_prime_np, K_prime_np, f)
 
     for j in range(timesteps):
 
@@ -196,7 +196,7 @@ if __name__ == "__main__":
                 N_count += 1  # Update Newton count
 
                 # Compute Newton to L-scheme switching indicators
-                scheme.N_to_L_eta(psi, psi_k, K_prime, theta_prime)
+                scheme.N_to_L_eta(psi, psi_k)
 
                 # Stopping criterion
                 valstop = scheme.linear_norm
@@ -221,7 +221,7 @@ if __name__ == "__main__":
                         ind = 0
 
                         # Compute L-scheme to Newton switching indicators
-                        scheme.L_to_N_eta(psi, psi_k, K_prime, theta_prime)
+                        scheme.L_to_N_eta(psi, psi_k)
 
                         psi_L_old = psi
                         valstop = scheme.linear_norm
@@ -245,9 +245,9 @@ if __name__ == "__main__":
                 L_count += 1  # Update L-scheme counter
 
                 # Estimate C_N^j
-                scheme.estimate_CN(K, K_prime, theta_prime, psi)
+                scheme.estimate_CN(psi)
                 # Compute L-scheme to Newton switching indicator
-                scheme.L_to_N_eta(psi, psi_k, K_prime, theta_prime)
+                scheme.L_to_N_eta(psi, psi_k)
 
                 # Stopping criterion
                 valstop = scheme.linear_norm
@@ -293,13 +293,14 @@ if __name__ == "__main__":
         xcoords, ycoords = coordinates[0:2]
         elements = g.cell_nodes()
 
-        # local to global map
-        cn = d.mapping.T
-        flat_list = d.local_dofs_corners
-        psi_plot = psi.copy()
-        plt.tricontourf(xcoords, ycoords, cn[:, flat_list], psi_plot, 40)
-        plt.colorbar()
-        plt.show()
+        ## local to global map
+        #cn = d.mapping.T
+        #flat_list = d.local_dofs_corners
+        #psi_plot = psi.copy()
+        #plt.tricontourf(xcoords, ycoords, cn[:, flat_list], psi_plot, 40)
+        #plt.colorbar()
+        #plt.show()
 
     print("Total number of iterations", count_tot)
     print("Total", "Newton iterations", N_count_tot, "L-scheme iterations", L_count_tot)
+    print(f"Total CPU time: {time.time() - tic}.")
