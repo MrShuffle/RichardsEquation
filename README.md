@@ -21,12 +21,11 @@ The associated article contains three test case, for which the code is provided 
 
 * Test 1: Stricly unsaturated medium. Code: './StrictlyUnsaturated_EX1.py'
 * Test 2: Variably saturated medium. Code: './VariablySaturated_EX2.py'
-* Test 3: (Benchmark_EX#): Realistic case, a recognized benchmark problem. Code: '*.py'
+* Test 3: Realistic case, a recognized benchmark problem. Code: '*./BenchmarkProblem_EX3.py'
 
-# TODO add location of code for example 3
 
 Using the codes, the results in the paper can be reproduced.
 
-# TODO Add comment whether the parameters have to be modified to reproduce the results or whether everything is provided.
+In order to run every example the the mesh size, time step size and L-parameter can be changed. The switch can be set to permanently be True to run only Newton's method or False to only apply the L-scheme.
 
-Comment: All run scripts can be modified to run just Newton or L-scheme by enforcing the Switch to be either false or true. Or it is possible to import the linearization schemes indivually from the Model_class_parallell file, where also the modified L-scheme is possible to import.
+
