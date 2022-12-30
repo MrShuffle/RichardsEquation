@@ -254,6 +254,7 @@ if __name__ == "__main__":
         ind = 0
 
         # Set Switch to false, i.e., start with L-scheme
+        # To only run Newton's method set to True
         Switch = False
 
         # Update time
@@ -370,7 +371,9 @@ if __name__ == "__main__":
 
             # Update counter
             count = count + 1
-
+            # In order to force Newton's method set Switch to True, 
+            # For the L-scheme set to False
+            # Switch=True
             print("Iteration dependent norm:", valstop)
             if valstop <= TOL:
                 break
