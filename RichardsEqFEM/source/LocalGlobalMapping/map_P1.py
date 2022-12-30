@@ -32,12 +32,12 @@ class Local_to_Global_table:
         # Nodes per element
         self.num_nodes_per_EL = 3
 
-        # Initialize list for the mapping.
+        # Initialize list for the mapping
         self.mapping = np.zeros(
             (self.num_nodes_per_EL, self.geometry.num_cells), dtype=int
         )
 
-        # Create list with global values;
+        # Initialize list with global values
         #         0 : The number of corner nodes
         #         1 : The number of faces
         #         2 : The number of cells
@@ -45,13 +45,13 @@ class Local_to_Global_table:
             [geometry.num_nodes, geometry.num_faces, geometry.num_cells]
         )
 
-        # Create list with nodes per geometric quantity
+        # Initialize list with nodes per geometric quantity
         #         0 : Number of proper nodes
         #         1 : Number of nodes per face
         #         2 : Number of nodes within the element
-        self.dofs_per_quantity = np.zeros(self.dim + 1, dtype=int)  # initialize
+        self.dofs_per_quantity = np.zeros(self.dim + 1, dtype=int)  
 
-        ########################
+        
         tmp_ind = np.arange(0, self.x_part)
         ind_1 = tmp_ind  # Lower left node in quad
         ind_2 = tmp_ind + 1  # Lower right node
@@ -71,13 +71,9 @@ class Local_to_Global_table:
 
         # Loop over all remaining rows in the y-direction.
         for iter1 in range(self.y_part - 1):
-            # The node numbers are increased by nx[0] + 1 for each row
             tri = np.hstack((tri, tri_base + (iter1 + 1) * (self.x_part + 1)))
 
         self.mapping = tri
-        #######################
-
-        # # Total number of nodes for any lagrange finite element
 
         # Geometric keyword dictionary
         self.geometry_keywords = {0: {"nodes"}, 1: {"faces"}, 2: {"elements"}}
@@ -92,14 +88,14 @@ class Local_to_Global_table:
         self.total_geometric_pts = int(np.dot(self.dofs_per_quantity, self.global_vals))
 
         self.points_glob = self.geometry.nodes
-
         self.numDataPts = self.global_vals[2] * self.element.num_dofs**2
 
+        # Initialize row and column data entries for coo_matrix
         self.row = np.empty(self.numDataPts, dtype=int)
         self.col = np.empty(self.numDataPts, dtype=int)
-
+        
+        # Compute row and column data entries 
         n = 0
-        # Generate row and col entries for coo_matrix
         for e in range(self.geometry.num_cells):
 
             cn = self.mapping[:, e]
@@ -108,13 +104,11 @@ class Local_to_Global_table:
                 self.col[n] = cn[l]
                 n += 1
 
-            # self.points_glob[:,self.mapping[:,e] ]
-
+            
+        # Extract only corner nodes (used for plotting)
         oo = list(self.local_dofs["nodes"].values())
         flat_list = [item for sublist in oo for item in sublist]
-
         flat_list[1], flat_list[2] = flat_list[2], flat_list[1]
-
         self.local_dofs_corners = flat_list
 
         # Fetch boundary nodes
@@ -125,6 +119,8 @@ class Local_to_Global_table:
         self.quad_pts = a[:, 0:2]
         self.quad_weights = 1 / 2 * a[:, 2]
 
+    
+    # Adding functions to the class for the purpose of using multiprocessing
     def L_scheme(self, K, theta, f):
         self.K = K
         self.theta = theta
@@ -137,41 +133,4 @@ class Local_to_Global_table:
         self.theta_prime = theta_prime
         self.f = f
 
-    def coarse_fine_mesh_nodes(self, x_part, y_part):
 
-        self.x_part = x_part
-        self.y_part = y_part
-        vab = np.arange(x_part + 1)[0 : int(x_part / 2 + 1)] * 2
-        self.dy = self.mapping[1, 1] * 2
-
-        a = np.zeros((int(x_part / 2 + 1), int(y_part / 2 + 1)), dtype=int)
-        for j in range(int(x_part / 2 + 1)):
-            a[j] = vab + self.dy * j
-
-        self.nodes_coarse = a
-        self.nodes_coarse_ordered = a.reshape(
-            -1,
-        )
-
-    def coarse_map(self):
-        x_row1 = self.nodes_coarse[0]
-        x_row2 = self.nodes_coarse[1]
-
-        ind_1 = self.nodes_coarse[0][0 : int(self.x_part / 2)]
-        ind_2 = self.nodes_coarse[0][1 : int(self.x_part / 2 + 1)]
-        ind_3 = self.dy + 2 + ind_1
-        ind_4 = self.dy + ind_1
-
-        tri_base = np.vstack((ind_1, ind_3, ind_2, ind_1, ind_4, ind_3)).reshape(
-            (3, -1), order="F"
-        )
-
-        tri = tri_base
-
-        # Loop over all remaining rows in the y-direction.
-        for iter1 in range(int(self.y_part / 2 - 1)):
-
-            # The node numbers are increased by nx[0] + 1 for each row
-            tri = np.hstack((tri, tri_base + (iter1 + 1) * (self.dy)))
-
-        self.mapping_coarse = tri
