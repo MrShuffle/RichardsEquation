@@ -21,7 +21,7 @@ The associated article contains three test case, for which the code is provided 
 
 * Test 1: Stricly unsaturated medium. Code: './StrictlyUnsaturated_EX1.py'
 * Test 2: Variably saturated medium. Code: './VariablySaturated_EX2.py'
-* Test 3: Realistic case, a recognized benchmark problem. Code: '*./BenchmarkProblem_EX3.py'
+* Test 3: Realistic case, a recognized benchmark problem. Code: './BenchmarkProblem_EX3.py'
 
 
 Using the codes, the results in the paper can be reproduced.
