@@ -889,6 +889,6 @@ class LN_alg:
 
     def update_L(self, L):
         """
-        Update of the L-scheme parameter.
+        Update of the L-scheme parameter. Used for Adaptive L-scheme.
         """
         self.L = L
