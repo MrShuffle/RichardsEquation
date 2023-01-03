@@ -574,7 +574,7 @@ class LN_alg:
         for k in range(len(u)):
 
             # Avoid discontinuity
-            if np.abs(gradeta[k]).any() > 0.5:  # look at this tomorrow.....
+            if np.abs(gradeta[k]).any() > 0.5:  
                 gradeta[k] = np.zeros((2,))
 
             # C_N^j definition is almost everywhere, for the benchmark problem 5-6 individual points
@@ -582,7 +582,7 @@ class LN_alg:
             # and the points are not measurable. (This criteria does not affect other examples)
             if math.isclose(
                 theta_prime_Q[k], 0
-            ):  # or 0.395999<=theta_in_Q[k].item()<=0.396:
+            ) or 0.395999<=theta_in_Q[k].item()<=0.396:
                 K_prime_Q[k] = 0
 
             else:
