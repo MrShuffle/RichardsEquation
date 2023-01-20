@@ -4,7 +4,7 @@ This repositoy contains the implementation of all examples shown and discussed i
 
 Stokke, J.S., Storvik, E., Mitra, K., Both, J.W., and Radu, F.A., An adaptive solution strategy for Richards' equation
 
-# TODO add reference to arxiv when published.
+https://arxiv.org/abs/2301.02055
 
 ---
 
