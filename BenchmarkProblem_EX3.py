@@ -210,7 +210,7 @@ if __name__ == "__main__":
     dt = 1/48
 
     # ! ---- Solver parameters
-    L = 4.501*10**(-2)
+    L = 3.501*10**(-2)
     TOL = 10 ** (-7)
 
     # ! ---- Solver
