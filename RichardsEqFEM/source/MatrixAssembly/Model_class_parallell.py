@@ -1605,14 +1605,14 @@ class LN_alg_heter:
                         (
                             (local_vals.K_in_Q[k] - local_vals.K_in_Q2[k])
                             * np.linalg.norm(
-                                local_vals.valgrad_Q2[k] @ J_inv.T + np.array([0, 1])
+                                local_vals.valgrad_Q2[k] @ self.glob_perm@J_inv.T + self.glob_perm@np.array([0, 1])
                             )
                         )
                         - (
                             local_vals.K_prime_Q2[k]
                             * (local_vals.val_Q[k] - local_vals.val_Q2[k])
                             * np.linalg.norm(
-                                local_vals.valgrad_Q[k] @ J_inv.T + np.array([0, 1])
+                                local_vals.valgrad_Q[k] @ self.glob_perm@J_inv.T + self.glob_perm@np.array([0, 1])
                             )
                         )
                     )
@@ -1630,7 +1630,7 @@ class LN_alg_heter:
                 + self.dt
                 * wi[k]
                 * local_vals.K_in_Q2[k]
-                * np.linalg.norm(local_vals.valgrad_Q3[k] @ J_inv.T) ** 2
+                * np.linalg.norm(local_vals.valgrad_Q3[k] @self.glob_perm@ J_inv.T) ** 2
                 for k in range(len(Phi))
             ]
         )
@@ -1741,7 +1741,7 @@ class LN_alg_heter:
                     / local_vals.K_in_Q[k] ** (1 / 2)
                     * ((local_vals.K_in_Q[k] - local_vals.K_in_Q2[k]))
                     * np.linalg.norm(
-                        local_vals.valgrad_Q[k] @ J_inv.T + np.array([0, 1])
+                        local_vals.valgrad_Q[k] @ self.glob_perm@J_inv.T + self.glob_perm@np.array([0, 1])
                     )
                 )
                 ** 2
@@ -1755,7 +1755,7 @@ class LN_alg_heter:
                 + self.dt
                 * self.d.quad_weights[k]
                 * local_vals.K_in_Q2[k]
-                * np.linalg.norm(local_vals.valgrad_Q3[k] @ J_inv.T) ** 2
+                * np.linalg.norm(local_vals.valgrad_Q3[k] @self.glob_perm@ J_inv.T) ** 2
                 * det_J
                 for k in range(len(Phi))
             ]
