@@ -10,6 +10,7 @@ from RichardsEqFEM.source.basisfunctions.lagrange_element import \
 from RichardsEqFEM.source.localevaluation.local_evaluation import \
     HydraulicsLocalEvaluation
 from RichardsEqFEM.source.utils.operators import reference_to_local
+import pyFreeFem as pyff
 
 # Module containing the local assembly for the L-scheme and Newton's method,
 # as well as all switching criteria for the adaptive algorithm.
@@ -127,7 +128,7 @@ class LN_alg_heter:
                 0:2, cn[self.d.local_dofs_corners]
             ]  # corners of element
 
-            if np.amax(corners[0])<=self.diff_perm:
+            if np.amax(corners[1])>=self.diff_perm:
                 self.element_indicator.append(element_num)
             # FE evaluations
             P_El = global_element_geometry(
@@ -641,7 +642,126 @@ class LN_alg_heter:
         Indicator for switch to Newton's method.
 
         """
+        script = pyff.edpScript('mesh Th = square( 40, 40 );')
+        script +=' fespace Vh( Th, P1 );'
+        script += pyff.InputScript( uh =w1,ul=w2,xpart=10,ypart=10)
+        #script += 'Vh y;'
+        #script +='y=uh;'
 
+        script += '''
+        // Define Fem spaces
+        //fespace Vh( Th, P1 ); // Can only be one place in script
+        fespace Vh2( Th, RT0 );
+        fespace Vh3(Th, P0);
+        fespace Vh4(Th,[RT0,P0]);
+
+        //Subsection%%%%%%% ABSOLUTE PERMEABILITY FUNCTIONS%%%%%%%%%%
+        real angle=pi/3, Ks=.1;
+
+        matrix Qtr=[[cos(angle), -sin(angle)], [sin(angle), cos(angle)]];//Transformation Matrix
+        matrix Kbase1=[[1, 0],[0, 0.5]];//Base Matrix
+        matrix Kbase1Inv=[[1, 0],[0,2]];//Base Inverse Matrix
+        matrix Kbase2=Qtr'*Kbase1; Kbase2=Kbase2*Qtr; Kbase2=Ks*Kbase2;//Second Base Matrix having Ks times the absolute value and making a (angle) radian slope
+        matrix Kbase2Inv=Qtr'*Kbase1Inv; Kbase2Inv=Kbase2Inv*Qtr; Kbase2Inv=Ks^-1*Kbase2Inv;// Inverse of Kbase2
+
+        func real DomNum()// Defines the domain where Kbase 1 is active
+        {
+        if(y<0.5) return 1.0;
+        else return 0.0;
+        }
+
+        //Absolute permeability function
+        func K= [[DomNum()*Kbase1(0,0)+ (1-DomNum())*Kbase2(0,0), DomNum()*Kbase1(0,1)+ (1-DomNum())*Kbase2(0,1)], [DomNum()*Kbase1(1,0)+ (1-DomNum())*Kbase2(1,0), DomNum()*Kbase1(1,1)+ (1-DomNum())*Kbase2(1,1)] ];
+
+
+        //Inverse of absolute permeability
+        func Kinv=[[DomNum()*Kbase1Inv(0,0)+ (1-DomNum())*Kbase2Inv(0,0), DomNum()*Kbase1Inv(0,1)+ (1-DomNum())*Kbase2Inv(0,1)], [DomNum()*Kbase1Inv(1,0)+ (1-DomNum())*Kbase2Inv(1,0), DomNum()*Kbase1Inv(1,1)+ (1-DomNum())*Kbase2Inv(1,1)] ];
+
+        func real Sat(real p)//Saturation function
+        {
+        
+        real result;  
+        if (p<1)
+            result = pow(2-p,-1.0/3.0);
+        else
+            result = 1;
+        
+        return result;
+
+        };
+
+        func real Perm(real s)//Permeability function
+        { if(s<1)
+        return s^3;
+        else 
+        return 1;
+        };
+
+        func real dSat(real p)//capillary pressure function
+        {
+        return pow(2-p,-4.0/3.0)/3.0;
+        }
+
+        macro grad(u) [dx(u), dy(u)] //Gradient
+        macro Div(u1,u2) (dx(u1) + dy(u2))//Divergence
+        real dt = 0.1, L=0.25;
+
+        // This should be input
+        Vh psik, psikm;
+        Vh hatty=1;
+        psik=uh;
+        psikm=ul;
+        Vh satOutput;
+        satOutput = Sat(psik);
+        //func inDegL = 1/dt*(L*(psik-psikm)-(Sat(psik)-Sat(psikm))); //L-scheme
+        func inDegN = 1/dt*(dSat(psik)*(psik-psikm)-(Sat(psik)-Sat(psikm))); // Newton
+
+        Vh Shproj, qproj;
+        problem SourceProj(Shproj,qproj)=int2d(Th)(Shproj*qproj)-int2d(Th)(inDegN*qproj);
+        SourceProj;
+        //plot(Shproj,coef=0.1,wait=1,ps="lapRTuv.eps",value=true);
+        //Vh4 [sga1,sga2,rh],[q1,q2,v]; // variables for equilibrated flux contributions
+        Vh2 [sga1,sga2], [q1,q2];
+        Vh3 rh,v;
+        problem mfem([sga1,sga2,rh],[q1,q2,v],solver=GMRES)=int2d(Th)([q1,q2]'*Kinv*[sga1,sga2]
+        - rh*Div(q1,q2) - Div(sga1,sga2)*v) //bilinear form
+        +int2d(Th)(hatty*Shproj*v);
+        //+ on(1, sga1=0, sga2=0);
+        mfem;
+        Vh xcomp,ycomp;
+        xcomp=sga1;
+        ycomp=sga2;
+        //plot([sga1,sga2],coef=0.1,wait=1,ps="lapRTuv.eps",value=true);
+        //varf a([sga1,sga2,rh],[q1,q2,v]) = int2d(Th)([q1,q2]'*Kinv*[sga1,sga2]
+        //   - rh*Div(q1,q2) - Div(sga1,sga2)*v)
+        //   + on(1,2,3,4,7,10, sga1=0, sga2=0);
+        
+        //macro SolverE sparsesolver
+        //matrix MatrEquil=a(Vh4,Vh4, solver=SolverE); //LU also possible
+        
+
+
+        
+
+        //varf l([unsused1,unsused2,unsused3],[q1,q2,v]) = int2d(Th)( 
+        //	- v)
+        //	+ on(1,2,3,4,7,10, unsused1 = 0, unsused2 = 0);
+
+        //Vh4 [F,F1,F2]; // right-hand side variables
+        //F[] = l(0,Vh4); // right-hand side of the local flux equilibration 
+        //sga1[] = MatrEquil^-1*F[]; // sga1[] contains the triplet sga1,sga2,gma
+        real Q=0.5;
+
+
+
+
+        '''
+        script    += pyff.OutputScript( xcomp='vector',ycomp='vector') # Define output
+        ff_output = script.get_output(uh=w1,ul=w2) # Execute pyFreeFem script
+        # Fetch output
+        x_comp = ff_output['xcomp']
+        y_comp = ff_output['ycomp']
+        self.Eql = np.stack((x_comp, y_comp),axis=1)
         # Guess CN
         CN = 0  # To speed up computations
         # self.estimate_CN(w1)
@@ -686,6 +806,8 @@ class LN_alg_heter:
         psi_local = np.array([self.w2[cn[i]] for i in range(3)])
         psi_local2 = np.array([self.w1[cn[i]] for i in range(3)])
         psi_local3 = np.array([self.diff[cn[i]] for i in range(3)])
+        eql_local = np.array([self.Eql[cn[i]] for i in range(3)])
+        #print(eql_local) 
         local_vals = self.hydraulics.function_evaluation_norms2(
             psi_local2,
             psi_local,
@@ -772,6 +894,126 @@ class LN_alg_heter:
         Indicator for switch to Newton's method.
 
         """
+        script = pyff.edpScript('mesh Th = square( 40, 40 );')
+        script +=' fespace Vh( Th, P1 );'
+        script += pyff.InputScript( uh =w1,ul=w2,xpart=10,ypart=10)
+        #script += 'Vh y;'
+        #script +='y=uh;'
+
+        script += '''
+        // Define Fem spaces
+        //fespace Vh( Th, P1 ); // Can only be one place in script
+        fespace Vh2( Th, RT0 );
+        fespace Vh3(Th, P0);
+        fespace Vh4(Th,[RT0,P0]);
+
+        //Subsection%%%%%%% ABSOLUTE PERMEABILITY FUNCTIONS%%%%%%%%%%
+        real angle=pi/3, Ks=.1;
+
+        matrix Qtr=[[cos(angle), -sin(angle)], [sin(angle), cos(angle)]];//Transformation Matrix
+        matrix Kbase1=[[1, 0],[0, 0.5]];//Base Matrix
+        matrix Kbase1Inv=[[1, 0],[0,2]];//Base Inverse Matrix
+        matrix Kbase2=Qtr'*Kbase1; Kbase2=Kbase2*Qtr; Kbase2=Ks*Kbase2;//Second Base Matrix having Ks times the absolute value and making a (angle) radian slope
+        matrix Kbase2Inv=Qtr'*Kbase1Inv; Kbase2Inv=Kbase2Inv*Qtr; Kbase2Inv=Ks^-1*Kbase2Inv;// Inverse of Kbase2
+
+        func real DomNum()// Defines the domain where Kbase 1 is active
+        {
+        if(y<0.5) return 1.0;
+        else return 0.0;
+        }
+
+        //Absolute permeability function
+        func K= [[DomNum()*Kbase1(0,0)+ (1-DomNum())*Kbase2(0,0), DomNum()*Kbase1(0,1)+ (1-DomNum())*Kbase2(0,1)], [DomNum()*Kbase1(1,0)+ (1-DomNum())*Kbase2(1,0), DomNum()*Kbase1(1,1)+ (1-DomNum())*Kbase2(1,1)] ];
+
+
+        //Inverse of absolute permeability
+        func Kinv=[[DomNum()*Kbase1Inv(0,0)+ (1-DomNum())*Kbase2Inv(0,0), DomNum()*Kbase1Inv(0,1)+ (1-DomNum())*Kbase2Inv(0,1)], [DomNum()*Kbase1Inv(1,0)+ (1-DomNum())*Kbase2Inv(1,0), DomNum()*Kbase1Inv(1,1)+ (1-DomNum())*Kbase2Inv(1,1)] ];
+
+        func real Sat(real p)//Saturation function
+        {
+        
+        real result;  
+        if (p<1)
+            result = pow(2-p,-1.0/3.0);
+        else
+            result = 1;
+        
+        return result;
+
+        };
+
+        func real Perm(real s)//Permeability function
+        { if(s<1)
+        return s^3;
+        else 
+        return 1;
+        };
+
+        func real dSat(real p)//capillary pressure function
+        {
+        return pow(2-p,-4.0/3.0)/3.0;
+        }
+
+        macro grad(u) [dx(u), dy(u)] //Gradient
+        macro Div(u1,u2) (dx(u1) + dy(u2))//Divergence
+        real dt = 0.1, L=0.25;
+
+        // This should be input
+        Vh psik, psikm;
+        Vh hatty=1;
+        psik=uh;
+        psikm=ul;
+        Vh satOutput;
+        //satOutput = Sat(psik);
+        func inDegL = 1/dt*(L*(psik-psikm)-(Sat(psik)-Sat(psikm))); //L-scheme
+        //func inDegN = 1/dt*(dSat(psik)*(psik-psikm)-(Sat(psik)-Sat(psikm))); // Newton
+
+        Vh Shproj, qproj;
+        problem SourceProj(Shproj,qproj)=int2d(Th)(Shproj*qproj)-int2d(Th)(inDegL*qproj);
+        SourceProj;
+        //plot(Shproj,coef=0.1,wait=1,ps="lapRTuv.eps",value=true);
+        //Vh4 [sga1,sga2,rh],[q1,q2,v]; // variables for equilibrated flux contributions
+        Vh2 [sga1,sga2], [q1,q2];
+        Vh3 rh,v;
+        problem mfem([sga1,sga2,rh],[q1,q2,v],solver=GMRES)=int2d(Th)([q1,q2]'*Kinv*[sga1,sga2]
+        - rh*Div(q1,q2) - Div(sga1,sga2)*v) //bilinear form
+        +int2d(Th)(hatty*Shproj*v);
+        //+ on(1, sga1=0, sga2=0);
+        mfem;
+        Vh xcomp,ycomp;
+        xcomp=sga1;
+        ycomp=sga2;
+        //plot([sga1,sga2],coef=0.1,wait=1,ps="lapRTuv.eps",value=true);
+        //varf a([sga1,sga2,rh],[q1,q2,v]) = int2d(Th)([q1,q2]'*Kinv*[sga1,sga2]
+        //   - rh*Div(q1,q2) - Div(sga1,sga2)*v)
+        //   + on(1,2,3,4,7,10, sga1=0, sga2=0);
+        
+        //macro SolverE sparsesolver
+        //matrix MatrEquil=a(Vh4,Vh4, solver=SolverE); //LU also possible
+        
+
+
+        
+
+        //varf l([unsused1,unsused2,unsused3],[q1,q2,v]) = int2d(Th)( 
+        //	- v)
+        //	+ on(1,2,3,4,7,10, unsused1 = 0, unsused2 = 0);
+
+        //Vh4 [F,F1,F2]; // right-hand side variables
+        //F[] = l(0,Vh4); // right-hand side of the local flux equilibration 
+        //sga1[] = MatrEquil^-1*F[]; // sga1[] contains the triplet sga1,sga2,gma
+        real Q=0.5;
+
+
+
+
+        '''
+        script    += pyff.OutputScript( xcomp='vector',ycomp='vector') # Define output
+        ff_output = script.get_output(uh=w1,ul=w2) # Execute pyFreeFem script
+        # Fetch output
+        x_comp = ff_output['xcomp']
+        y_comp = ff_output['ycomp']
+        self.Eql = np.stack((x_comp, y_comp),axis=1)
         # Estimate CN
         self.estimate_CN(w1)
         self.CN = self.CN
@@ -821,7 +1063,7 @@ class LN_alg_heter:
         psi_local = np.array([self.w2[cn[i]] for i in range(3)])
         psi_local2 = np.array([self.w1[cn[i]] for i in range(3)])
         psi_local3 = np.array([self.diff[cn[i]] for i in range(3)])
-
+        eql_local = np.array([self.Eql[cn[i]] for i in range(3)])
         # Local function evaluations
         local_vals = self.hydraulics.function_evaluation_norms(
             psi_local2,
@@ -863,10 +1105,10 @@ class LN_alg_heter:
                 * (
                     1
                     / local_vals.K_in_Q[k] ** (1 / 2)
-                    * ((local_vals.K_in_Q[k] - local_vals.K_in_Q2[k]))
+                    * (((local_vals.K_in_Q[k] - local_vals.K_in_Q2[k]))
                     * np.linalg.norm(
                         local_vals.valgrad_Q[k] @ self.glob_perm@J_inv.T + self.glob_perm@np.array([0, 1])
-                    )
+                    )+np.linalg.norm(eql_local[k]))
                 )
                 ** 2
                 for k in range(len(Phi))
