@@ -642,7 +642,7 @@ class LN_alg_heter:
         Indicator for switch to Newton's method.
 
         """
-        script = pyff.edpScript('mesh Th = square( 40, 40 );')
+        script = pyff.edpScript('mesh Th = square( 80, 80 );')
         script +=' fespace Vh( Th, P1 );'
         script += pyff.InputScript( uh =w1,ul=w2,xpart=10,ypart=10)
         #script += 'Vh y;'
@@ -702,6 +702,16 @@ class LN_alg_heter:
         return pow(2-p,-4.0/3.0)/3.0;
         }
 
+        func real Degdom()
+        {
+        
+        if (0.25<y<0.75) 
+            if (x<0.2)
+            return 1.0;
+        else 
+            return 0.0;
+        };
+
         macro grad(u) [dx(u), dy(u)] //Gradient
         macro Div(u1,u2) (dx(u1) + dy(u2))//Divergence
         real dt = 0.1, L=0.25;
@@ -714,16 +724,16 @@ class LN_alg_heter:
         Vh satOutput;
         satOutput = Sat(psik);
         //func inDegL = 1/dt*(L*(psik-psikm)-(Sat(psik)-Sat(psikm))); //L-scheme
-        func inDegN = 1/dt*(dSat(psik)*(psik-psikm)-(Sat(psik)-Sat(psikm))); // Newton
+        func inDegN = Degdom()*1/dt*(dSat(psik)*(psik-psikm)-(Sat(psik)-Sat(psikm))); // Newton
 
         Vh Shproj, qproj;
-        problem SourceProj(Shproj,qproj)=int2d(Th)(Shproj*qproj)-int2d(Th)(inDegN*qproj);
+        problem SourceProj(Shproj,qproj,solver=UMFPACK)=int2d(Th)(Shproj*qproj)-int2d(Th)(inDegN*qproj);
         SourceProj;
         //plot(Shproj,coef=0.1,wait=1,ps="lapRTuv.eps",value=true);
         //Vh4 [sga1,sga2,rh],[q1,q2,v]; // variables for equilibrated flux contributions
         Vh2 [sga1,sga2], [q1,q2];
         Vh3 rh,v;
-        problem mfem([sga1,sga2,rh],[q1,q2,v],solver=GMRES)=int2d(Th)([q1,q2]'*Kinv*[sga1,sga2]
+        problem mfem([sga1,sga2,rh],[q1,q2,v],solver=UMFPACK)=int2d(Th)([q1,q2]'*Kinv*[sga1,sga2]
         - rh*Div(q1,q2) - Div(sga1,sga2)*v) //bilinear form
         +int2d(Th)(hatty*Shproj*v);
         //+ on(1, sga1=0, sga2=0);
@@ -815,7 +825,7 @@ class LN_alg_heter:
             Phi,
             dPhi,
         )
-
+        sty = np.sum(Phi[:, :, np.newaxis] * eql_local[:, np.newaxis, :], axis=1)
         R_h = np.dot((psi_local3).T.reshape(3), Phi.T)
 
         K_nonzero = [
@@ -857,7 +867,7 @@ class LN_alg_heter:
                             * np.linalg.norm(
                                 local_vals.valgrad_Q[k] @ self.glob_perm@J_inv.T + self.glob_perm@np.array([0, 1])
                             )
-                        )
+                        ) + np.linalg.norm(sty[k])
                     )
                     * 1
                     / local_vals.K_in_Q[k] ** (1 / 2)
@@ -894,7 +904,7 @@ class LN_alg_heter:
         Indicator for switch to Newton's method.
 
         """
-        script = pyff.edpScript('mesh Th = square( 40, 40 );')
+        script = pyff.edpScript('mesh Th = square( 80, 80 );')
         script +=' fespace Vh( Th, P1 );'
         script += pyff.InputScript( uh =w1,ul=w2,xpart=10,ypart=10)
         #script += 'Vh y;'
@@ -921,6 +931,16 @@ class LN_alg_heter:
         if(y<0.5) return 1.0;
         else return 0.0;
         }
+
+        func real Degdom()
+        {
+        
+        if (0.25<y<0.75) 
+            if (x<0.2)
+            return 1.0;
+        else 
+            return 0.0;
+        };
 
         //Absolute permeability function
         func K= [[DomNum()*Kbase1(0,0)+ (1-DomNum())*Kbase2(0,0), DomNum()*Kbase1(0,1)+ (1-DomNum())*Kbase2(0,1)], [DomNum()*Kbase1(1,0)+ (1-DomNum())*Kbase2(1,0), DomNum()*Kbase1(1,1)+ (1-DomNum())*Kbase2(1,1)] ];
@@ -965,17 +985,17 @@ class LN_alg_heter:
         psikm=ul;
         Vh satOutput;
         //satOutput = Sat(psik);
-        func inDegL = 1/dt*(L*(psik-psikm)-(Sat(psik)-Sat(psikm))); //L-scheme
+        func inDegL = Degdom()*1/dt*(L*(psik-psikm)-(Sat(psik)-Sat(psikm))); //L-scheme
         //func inDegN = 1/dt*(dSat(psik)*(psik-psikm)-(Sat(psik)-Sat(psikm))); // Newton
 
         Vh Shproj, qproj;
-        problem SourceProj(Shproj,qproj)=int2d(Th)(Shproj*qproj)-int2d(Th)(inDegL*qproj);
+        problem SourceProj(Shproj,qproj,solver=UMFPACK)=int2d(Th)(Shproj*qproj)-int2d(Th)(inDegL*qproj);
         SourceProj;
         //plot(Shproj,coef=0.1,wait=1,ps="lapRTuv.eps",value=true);
         //Vh4 [sga1,sga2,rh],[q1,q2,v]; // variables for equilibrated flux contributions
         Vh2 [sga1,sga2], [q1,q2];
         Vh3 rh,v;
-        problem mfem([sga1,sga2,rh],[q1,q2,v],solver=GMRES)=int2d(Th)([q1,q2]'*Kinv*[sga1,sga2]
+        problem mfem([sga1,sga2,rh],[q1,q2,v],solver=UMFPACK)=int2d(Th)([q1,q2]'*Kinv*[sga1,sga2]
         - rh*Div(q1,q2) - Div(sga1,sga2)*v) //bilinear form
         +int2d(Th)(hatty*Shproj*v);
         //+ on(1, sga1=0, sga2=0);
@@ -1026,7 +1046,7 @@ class LN_alg_heter:
         self.diff = self.w1 - self.w2
 
         # Local assembly
-        pool = Pool(8)
+        pool = Pool(1)
         elements_list = list(range(self.g.num_cells))
         results = pool.map(self.norm_L_to_N_on_element, elements_list)
 
@@ -1072,7 +1092,11 @@ class LN_alg_heter:
             Phi,
             dPhi,
         )
-
+        #print(Phi)
+        
+        sty = np.sum(Phi[:, :, np.newaxis] * eql_local[:, np.newaxis, :], axis=1)
+        #print(Phi@eql_local)
+        #print(np.dot(Phi,eql_local[0]),'sfsf')
         R_h = np.dot((psi_local3).T.reshape(len(psi_local)), Phi.T)
 
         K_nonzero = [
@@ -1108,7 +1132,7 @@ class LN_alg_heter:
                     * (((local_vals.K_in_Q[k] - local_vals.K_in_Q2[k]))
                     * np.linalg.norm(
                         local_vals.valgrad_Q[k] @ self.glob_perm@J_inv.T + self.glob_perm@np.array([0, 1])
-                    )+np.linalg.norm(eql_local[k]))
+                    )+np.linalg.norm(sty[k]))
                 )
                 ** 2
                 for k in range(len(Phi))
