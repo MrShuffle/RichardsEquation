@@ -26,7 +26,7 @@ The associated article contains three test case, for which the code is provided 
 * Test 1: Stricly unsaturated medium. Code: './StrictlyUnsaturated_EX1.py'
 * Test 2: Variably saturated medium. Code: './VariablySaturated_EX2.py'
 * Test 3: Realistic case, a recognized benchmark problem. Code: './BenchmarkProblem_EX3.py'
-* Test 4: To appear soon.
+* Test 4: Heterogeneous and anisotropic medium. Test case is from: https://inria.hal.science/hal-03328944v2. Code: ./MITRA_EX4
 
 
 Using the codes, the results in the paper can be reproduced. Note that the number of cpus used can be specified in the algorithm, currently set to 8.
