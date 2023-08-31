@@ -31,7 +31,7 @@ The associated article contains three test case, for which the code is provided 
 
 Using the codes, the results in the paper can be reproduced. Note that the number of cpus used can be specified in the algorithm, currently set to 8.
 
-In order to run every variation of the examples the mesh size, time step size and L-parameter can be changed. The switch can be set to permanently be True to run only Newton's method or False to only apply the L-scheme. See documentation in script.
+In order to run every variation of the examples the mesh size, time step size and L-parameter can be changed. The switch can be set to permanently be True to run only Newton's method or False to only apply the L-scheme. See documentation in script. To modify test case number 4, the source code must be manually edited.
 
 
 
